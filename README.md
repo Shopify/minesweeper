@@ -15,8 +15,10 @@ Minesweeper is a Go tool to detect websites that have been infected with malware
   ``http://phantomjs.org/download.html``
   
   2. **Install minesweeper**
-  
-  Download binary for Mac, 64-bit [Release v0.1.0 "Hello World"](https://github.com/Shopify/minesweeper/releases/download/v0.1.0/minesweeper-0.1.0-darwin-amd64.tar.zip)
+    
+  Download **Release v0.1.0 "Hello World**  
+  [Mac 64bit](https://github.com/Shopify/minesweeper/releases/download/v0.1.0/minesweeper-0.1.0-darwin-amd64.tar.zip)  
+  [Linux 64bit](https://github.com/Shopify/minesweeper/releases/download/v0.1.0/minesweeper-0.1.0-linux-amd64.tar.zip)
 
 ## Usage
 
