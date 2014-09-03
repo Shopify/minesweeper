@@ -158,7 +158,6 @@ func startLoProxy() string {
 	checkErr(err, "proxy split host port")
 
 	go http.Serve(ln, proxy)
-	//time.Sleep(500 * time.Millisecond)
 
 	return port
 }
