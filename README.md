@@ -31,6 +31,42 @@ Options:
   -z=100: Wait around (ms) for Javascript to exec after page load
 ```
 
+## Example
+
+```
+$ minesweeper ianfette.org
+ {
+  "Url": "http://ianfette.org",
+  "CreatedAt": "Wed Sep  3 22:27:40 UTC 2014",
+  "RunDir": "/var/folders/dg/m668qw1x3szdyhmt8qs0qq3w0000gn/T/minesweeper458550870",
+  "Resources": [
+    {
+      "Method": "GET",
+      "Url": "http://ianfette.org/",
+      "Status": 200,
+      "ContentType": "text/html",
+      "ContentLength": 43,
+      "MinesweeperSha256": "0e7d00142cf0f74c7e4d5b2469c016bd421837ce692cd6a276fce2f3d5fc3a06",
+      "MinesweeperSniffedMime": "text/html; charset=utf-8",
+      "MinesweeperHostAddr": "173.201.140.128"
+    }
+  ],
+  "Changes": null,
+  "Hits": [
+    {
+      "BlacklistName": "google",
+      "Url": "http://ianfette.org/",
+      "Domain": "ianfette.org",
+      "Type": "malware",
+      "Ref": "https://developers.google.com/safe-browsing/developers_guide_v3"
+    }
+  ],
+  "Alerts": null,
+  "Verdict": "suspicious"
+}
+```
+
+
 ## How does it work?
 
 **Minesweeper scans websites using [PhantomJS](http://phantomjs.org/) through a local MITM proxy**
