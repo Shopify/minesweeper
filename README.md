@@ -84,7 +84,7 @@ $ minesweeper ianfette.org
   * HTTP requests for resources such as Javascript and CSS files
     * URL, Method, Status, Content-Type
     * A sha256 sum for a file - useful for submitting to [VirusTotal](https://www.virustotal.com/)
-    * A MIME-sniffed Content-Type determined using `http://mimesniff.spec.whatwg.org/` through `DetectContentType`(http://golang.org/pkg/net/http/#DetectContentType)
+    * A MIME-sniffed Content-Type determined using [DetectContentType](http://golang.org/pkg/net/http/#DetectContentType)
   * Javascript calls to `document.write()`
     * The HTML to be written is recorded
     * A stack trace is captured to attribute this back to an exact line in the source!
