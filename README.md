@@ -17,6 +17,11 @@ Minesweeper is a Go tool to detect websites that have been infected with malware
   2. **Install minesweeper**
     
   Download **Release v0.1.0 "Hello World** for [Mac 64bit](https://github.com/Shopify/minesweeper/releases/download/v0.1.0/minesweeper-0.1.0-darwin-amd64.tar.zip) or [Linux 64bit](https://github.com/Shopify/minesweeper/releases/download/v0.1.0/minesweeper-0.1.0-linux-amd64.tar.zip)
+  
+  3. Optional - **Grab a Google API key**
+  
+  Setup a Google API key by following [these intructions](https://developers.google.com/safe-browsing/lookup_guide#GettingStarted).  
+  Add the key as an ENV variable e.g. `export MINESWEEPER_GOOGLE_API_KEY="<YOUR_KEY>"`
 
 ## Usage
 
@@ -102,7 +107,7 @@ $ minesweeper ianfette.org
       * ```malwaredomains``` - [malwaredomains.com](http://www.malwaredomains.com/)
 
 **It produces a [JSON](http://en.wikipedia.org/wiki/JSON) report**
-* If there are any IDS alerts or Blacklist hits, the website is deemed ```suspicious```, otherwise it's ```ok```.
+* If there are IDS alerts or Blacklist hits, the website is deemed ```suspicious```, otherwise it's ```ok```.
 
 
 ## Questions
