@@ -12,9 +12,9 @@ minesweeper
   Binary Install  
   ``http://phantomjs.org/download.html``
 
-2. **Install the minesweeper binary**
+2. **Install minesweeper **
 
-  Download [Release v0.1.0 "Hello World"](https://github.com/Shopify/minesweeper/releases/download/v0.1.0/minesweeper-0.1.0-darwin-amd64.tar.zip)
+  Download binary for Mac, 64-bit [Release v0.1.0 "Hello World"](https://github.com/Shopify/minesweeper/releases/download/v0.1.0/minesweeper-0.1.0-darwin-amd64.tar.zip)
 
 ## Usage
 ```
