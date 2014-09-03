@@ -14,7 +14,7 @@ minesweeper
 
 2. **Install the minesweeper binary**
 
-  Download [Release v0.1.0 "Hello World"](https://github.com/Shopify/minesweeper/releases/download/v0.1.0/minesweeper)
+  Download [Release v0.1.0 "Hello World"](https://github.com/Shopify/minesweeper/releases/download/v0.1.0/minesweeper-0.1.0-darwin-amd64.tar.zip)
 
 ## Usage
 ```
