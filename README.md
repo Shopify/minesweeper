@@ -23,6 +23,10 @@ Minesweeper is a Go tool to detect websites that have been infected with malware
   Setup a Google API key by following [these intructions](https://developers.google.com/safe-browsing/lookup_guide#GettingStarted).  
   Add the key as an ENV variable e.g. `export MINESWEEPER_GOOGLE_API_KEY="<YOUR_KEY>"`
 
+  4. Optional - **Install Suricata**
+  
+  Instructions and sample config coming soon.
+
 ## Usage
 
 ```
