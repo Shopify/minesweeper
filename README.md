@@ -116,4 +116,4 @@ $ minesweeper ianfette.org
 
 ## Questions
 
-Please contact martin.charlesworth@shopify.com
+Please contact [falsenegative](https://github.com/falsenegative)
