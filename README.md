@@ -84,11 +84,10 @@ $ minesweeper ianfette.org
   * HTTP requests for resources such as Javascript and CSS files
     * URL, Method, Status, Content-Type
     * A sha256 sum for a file - useful for submitting to [VirusTotal](https://www.virustotal.com/)
-    * A decompressed file size in bytes - it also attempts to turn off compression by setting Accept-Encoding: none
-    * A MIME file type determined using [python-magic](https://github.com/ahupp/python-magic), a libmagic wrapper
+    * A MIME-sniffed Content-Type determined using `http://mimesniff.spec.whatwg.org/` through `DetectContentType`(http://golang.org/pkg/net/http/#DetectContentType)
   * Javascript calls to `document.write()`
     * The HTML to be written is recorded
-    * A stack trace is captured to attribute this back to it's source
+    * A stack trace is captured to attribute this back to an exact line in the source!
   * Javascript [DOMSubtreeModified](http://www.w3.org/TR/DOM-Level-3-Events/#event-type-DOMSubtreeModified) Mutation Events where the target is either HTMLScriptElement or HTMLIFrameElement
     * The outer HTML of the modification is recorded
 * You can configure:
