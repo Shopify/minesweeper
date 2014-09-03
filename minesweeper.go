@@ -192,7 +192,7 @@ func Minesweeper(rawurl string, options *MinesweeperOptions) (bool, string) {
 	_, cacheDir := createBaseAndCacheDirs()
 
 	bls := blacklist.Init(cacheDir)
-	idss := ids.Init(cacheDir)
+	idss := ids.Init()
 
 	proxyPort := startLoProxy()
 

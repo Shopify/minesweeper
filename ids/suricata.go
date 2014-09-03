@@ -2,7 +2,8 @@ package ids
 
 import (
 	"bufio"
-	"log"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,26 +17,30 @@ type Suricata struct {
 	AlertRegexp *regexp.Regexp
 }
 
-func (i *Suricata) Name() string {
+func (i *Suricata) Name() (name string) {
 	return "Suricata"
 }
 
-func (i *Suricata) Init(cacheDir string) {
+func (i *Suricata) Init() (err error) {
 	i.AlertsFile = "/var/log/suricata/fast.log"
 	i.RulesDir = "/etc/suricata/rules"
 
 	i.AlertRegexp, _ = regexp.Compile(`^(\d{2}\/\d{2}\/\d{4}-\d{2}:\d{2}:\d{2})\.(\d{6})  \[\*\*\] \[(\d+):(\d+):(\d+)\] (.+?) \[\*\*\] \[Classification: (.+?)\] \[Priority: (\d+)\] \{(.+?)\} ((?:[0-9]{1,3}\.){3}[0-9]{1,3}):(\d+) -> ((?:[0-9]{1,3}\.){3}[0-9]{1,3}):(\d+)$`)
-}
-
-func (i *Suricata) Update() {
-}
-
-func (i *Suricata) Check(startTime time.Time, endTime time.Time, proxyPort string) []Alert {
-	var alerts []Alert
 
 	f, err := os.Open(i.AlertsFile)
 	if err != nil {
-		log.Fatal(err)
+		return errors.New("Couldn't open suricata alerts file: " + i.AlertsFile)
+	}
+	defer f.Close()
+
+	return nil
+}
+
+func (i *Suricata) Check(startTime time.Time, endTime time.Time, proxyPort string) (alerts []Alert) {
+	f, err := os.Open(i.AlertsFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR [suricata open alerts file] %s\n ", err)
+		return
 	}
 	defer f.Close()
 
@@ -80,7 +85,8 @@ func (i *Suricata) Check(startTime time.Time, endTime time.Time, proxyPort strin
 	}
 
 	if err := scanner.Err(); err != nil {
-		log.Fatal(err)
+		fmt.Fprintf(os.Stderr, "ERROR [suricata scanner] %s\n ", err)
+		return
 	}
 
 	return alerts
@@ -94,7 +100,7 @@ func findRule(rulesDir string, sid string) string {
 	for _, rulesFile := range rulesFiles {
 		f, err := os.Open(rulesFile)
 		if err != nil {
-			log.Fatal(err)
+			return "" // TODO error handling here
 		}
 		defer f.Close()
 

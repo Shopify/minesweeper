@@ -1,13 +1,15 @@
 package ids
 
 import (
+	"fmt"
+	"os"
 	"time"
 )
 
 type Ids interface {
-	Name() string
-	Init(cacheDir string)
-	Check(startTime time.Time, endTime time.Time, proxyPort string) []Alert
+	Name() (name string)
+	Init() (err error)
+	Check(startTime time.Time, endTime time.Time, proxyPort string) (alerts []Alert)
 }
 
 type Alert struct {
@@ -17,21 +19,25 @@ type Alert struct {
 	Rule    string
 }
 
-func Init(cacheDir string) []Ids {
-	var idss []Ids
+func Init() (idss []Ids) {
+	var loadIdss []Ids
 
-	idss = append(idss, new(Suricata))
+	loadIdss = append(loadIdss, new(Suricata))
 
-	for _, ids := range idss {
-		ids.Init(cacheDir)
+	for _, ids := range loadIdss {
+		err := ids.Init()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR [init] %s\n ", err)
+			continue
+		}
+
+		idss = append(idss, ids)
 	}
 
 	return idss
 }
 
-func Check(idss []Ids, startTime time.Time, endTime time.Time, proxyPort string) []Alert {
-	var alerts []Alert
-
+func Check(idss []Ids, startTime time.Time, endTime time.Time, proxyPort string) (alerts []Alert) {
 	for _, ids := range idss {
 		alerts = append(alerts, ids.Check(startTime, endTime, proxyPort)...)
 	}

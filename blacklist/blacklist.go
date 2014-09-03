@@ -38,7 +38,7 @@ func Init(cacheDir string) (bls []Blacklist) {
 
 		err := bl.Init(blCacheDir)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR [init] %s\n ", err)
+			fmt.Fprintf(os.Stderr, "ERROR [init] %s\n", err)
 			continue
 		}
 
