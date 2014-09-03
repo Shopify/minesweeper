@@ -91,9 +91,10 @@ $ minesweeper ianfette.org
     * A stack trace is captured to attribute this back to it's source
   * Javascript [DOMSubtreeModified](http://www.w3.org/TR/DOM-Level-3-Events/#event-type-DOMSubtreeModified) Mutation Events where the target is either HTMLScriptElement or HTMLIFrameElement
     * The outer HTML of the modification is recorded
-* You can configure: (see options section below)
+* You can configure:
   * User-Agent - check out [useragentstring.com](http://www.useragentstring.com/) to build your own
-  * Set an amount of milliseconds to wait for subsequent javascript requests after the initial load
+  * Set an amount of milliseconds to wait for subsequent Javascript requests after the initial load
+  * Lots more, `minesweeper -h`
 
 **It captures the traffic between PhantomJS and the local MITM proxy**
 * Capturing here means that the IDS has a chance to alert on HTTP request content that will never be seen in a non-proxied environment e.g. a ```<script>``` tag referencing a malicious domain that has been DNS blacklisted.
