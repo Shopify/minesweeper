@@ -39,9 +39,9 @@ Minesweeper will browse the URL, perform a security analysis and produce a verdi
 
 A JSON report is returned if the verdict is `suspicious`. Nothing is returned if it's `ok`.
 
-A `suspicious` verdict means that a module has produced a positive `hit` or `alert`.
+A `suspicious` verdict means that a module has produced a positive (blacklist) `hit` or (IDS) `alert`.
 
-Currently, there are 3 modules: [`malwaredomains`](blacklists/malwaredomains.go), [`google`](blacklists/google.go) and [`suricata`](ids/suricata.go).
+Currently, there are 3 modules: [`malwaredomains`](blacklist/malwaredomains.go), [`google`](blacklist/google.go) and [`suricata`](ids/suricata.go).
 
 ## Example
 
