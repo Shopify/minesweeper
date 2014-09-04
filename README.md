@@ -1,7 +1,7 @@
 minesweeper
 ===========
 
-Minesweeper is a Go tool used to detect websites infected with drive-by malware.
+Minesweeper is a tool to detect websites infected with drive-by malware.
 
 [Shopify](https://github.com/Shopify) uses Minesweeper to protect its 100,000+ online stores from web-based malware infections.
 
@@ -20,7 +20,7 @@ Minesweeper deals with not only the problem of detecting the malware, but also a
   
   2. **Install minesweeper**
     
-  Download **Release v0.1.0 "Hello World** for [Mac 64bit](https://github.com/Shopify/minesweeper/releases/download/v0.1.0/minesweeper-0.1.0-darwin-amd64.tar.zip) or [Linux 64bit](https://github.com/Shopify/minesweeper/releases/download/v0.1.0/minesweeper-0.1.0-linux-amd64.tar.zip)
+  Download **Release v0.1.0 "Hello World"** for [Mac 64bit](https://github.com/Shopify/minesweeper/releases/download/v0.1.0/minesweeper-0.1.0-darwin-amd64.tar.zip) or [Linux 64bit](https://github.com/Shopify/minesweeper/releases/download/v0.1.0/minesweeper-0.1.0-linux-amd64.tar.zip)
   
   3. Optional - **Grab a Google API key**
   
