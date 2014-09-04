@@ -93,18 +93,20 @@ func sniffLoDumpPcap(pcapFname string, bpf string) {
 	err = liveHandle.SetBPFFilter(bpf)
 	checkErr(err, "pcap set bpf")
 
-	f, err := os.Create(pcapFname)
-	checkErr(err, "open pcap file")
-	defer f.Close()
+	go func() {
+		f, err := os.Create(pcapFname)
+		checkErr(err, "open pcap file")
+		defer f.Close()
 
-	w := pcapgo.NewWriter(f)
-	w.WriteFileHeader(65536, liveHandle.LinkType())
+		w := pcapgo.NewWriter(f)
+		w.WriteFileHeader(65536, liveHandle.LinkType())
 
-	packetSource := gopacket.NewPacketSource(liveHandle, liveHandle.LinkType())
-	for packet := range packetSource.Packets() {
-		err = w.WritePacket(packet.Metadata().CaptureInfo, packet.Data())
-		checkErr(err, "write packet to pcap file")
-	}
+		packetSource := gopacket.NewPacketSource(liveHandle, liveHandle.LinkType())
+		for packet := range packetSource.Packets() {
+			err = w.WritePacket(packet.Metadata().CaptureInfo, packet.Data())
+			checkErr(err, "write packet to pcap file")
+		}
+	}()
 }
 
 func startLoProxy() string {
@@ -180,11 +182,15 @@ func Minesweeper(rawurl string, options *MinesweeperOptions) (bool, string) {
 
 	createdAt := time.Now().UTC()
 
+	u, err := url.Parse(rawurl)
+	checkErr(err, "parse url")
+
+	_, err = net.LookupHost(u.Host)
+	checkErr(err, "lookup host")
+
 	runDir, err := ioutil.TempDir(options.DefaultDir, "minesweeper")
 	checkErr(err, "create temp dir")
 
-	u, err := url.Parse(rawurl)
-	checkErr(err, "parse url")
 	urlForFname := regexp.MustCompile("[^a-zA-Z0-9]").ReplaceAllString(u.String(), "_")
 	minesweeperFileName := filepath.Join(runDir, "minesweeper_"+createdAt.Format("20060102150405")+"_"+urlForFname)
 
@@ -196,7 +202,7 @@ func Minesweeper(rawurl string, options *MinesweeperOptions) (bool, string) {
 	proxyPort := startLoProxy()
 
 	if options.Pcap {
-		go sniffLoDumpPcap(minesweeperFileName+".pcap", "tcp port "+proxyPort)
+		sniffLoDumpPcap(minesweeperFileName+".pcap", "tcp port "+proxyPort)
 	}
 
 	phantomScript := filepath.Join(runDir, "minesweeper.js")

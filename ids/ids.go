@@ -27,7 +27,7 @@ func Init() (idss []Ids) {
 	for _, ids := range loadIdss {
 		err := ids.Init()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR [init] %s\n ", err)
+			fmt.Fprintf(os.Stderr, "WARNING [init] %s\n ", err)
 			continue
 		}
 
