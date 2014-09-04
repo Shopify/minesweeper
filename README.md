@@ -35,11 +35,11 @@ Minesweeper deals with not only the problem of detecting the malware, but also a
 
 `$ minesweeper [options...] <url>`
 
-Minesweeper will browse the URL and perform a security analysis.
+Minesweeper will browse the URL, perform a security analysis and produce a verdict.
 
-Nothing is returned if everything is `ok`. However, if the URL is flagged as `suspicious`, a JSON report is output.
+A JSON report is returned if the verdict is `suspicious`. Nothing is returned if it's `ok`.
 
-A `suspicious` verdict is returned when a module returns a positive `hit` or `alert`.
+A `suspicious` verdict means that a module has produced a positive `hit` or `alert`.
 
 Currently, there are 3 modules: `malwaredomains`, `google` and `suricata`.
 
