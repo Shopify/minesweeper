@@ -41,7 +41,7 @@ A JSON report is returned if the verdict is `suspicious`. Nothing is returned if
 
 A `suspicious` verdict means that a module has produced a positive `hit` or `alert`.
 
-Currently, there are 3 modules: `malwaredomains`, `google` and `suricata`.
+Currently, there are 3 modules: [`malwaredomains`](blacklists/malwaredomains.go), [`google`](blacklists/google.go) and [`suricata`](ids/suricata.go).
 
 ## Example
 
