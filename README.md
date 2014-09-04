@@ -20,7 +20,7 @@ Minesweeper deals with not only the problem of detecting the malware, but also a
   
   2. **Install minesweeper**
     
-  Download Release v0.1.0 "Hello World" for [Mac 64bit](https://github.com/Shopify/minesweeper/releases/download/v0.1.1/minesweeper-0.1.1-darwin-amd64.tar.gz) or [Linux 64bit](https://github.com/Shopify/minesweeper/releases/download/v0.1.1/minesweeper-0.1.1-linux-amd64.tar.gz)
+  Download Release "Hello World" for [Mac 64bit](https://github.com/Shopify/minesweeper/releases/download/v0.1.1/minesweeper-0.1.1-darwin-amd64.tar.gz) or [Linux 64bit](https://github.com/Shopify/minesweeper/releases/download/v0.1.1/minesweeper-0.1.1-linux-amd64.tar.gz)
   
   3. Optional - **Grab a Google API key**
   
