@@ -12,16 +12,14 @@ Minesweeper deals with not only the problem of detecting the malware, but also a
 
 ## Usage
 
-```
-Usage: minesweeper [options...] <url>
-Options:
-  -d="": Specify the directory to hold the Runtime Directory (RunDir). Passed as first arg to osutil.Tempdir)
-  -k=false: Keep RunDir. Do not automatically remove the directory.
-  -p=false: Capture and dump traffic to a PCAP file in RunDir
-  -u="Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:31.0) Gecko/20100101 Firefox/31.0": User-Agent
-  -v=false: Verbose - always show the JSON report, rather than just on suspicious verdicts
-  -z=100: Wait around (ms) for Javascript to exec after page load
-```
+    Usage: minesweeper [options...] <url>
+    Options:
+      -d="": Specify the directory to hold the Runtime Directory (RunDir). Passed as first arg to osutil.Tempdir)
+      -k=false: Keep RunDir. Do not automatically remove the directory.
+      -p=false: Capture and dump traffic to a PCAP file in RunDir
+      -u="Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:31.0) Gecko/20100101 Firefox/31.0": User-Agent
+      -v=false: Verbose - always show the JSON report, rather than just on suspicious verdicts
+      -z=100: Wait around (ms) for Javascript to exec after page load
 
 ## Example
 
