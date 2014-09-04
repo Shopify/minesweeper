@@ -78,7 +78,6 @@ $ minesweeper ianfette.org
 }
 ```
 
-
 ## How does it work?
 
 **Minesweeper scans websites using [PhantomJS](http://phantomjs.org/) through a local MITM proxy**
@@ -91,12 +90,8 @@ $ minesweeper ianfette.org
   * Javascript calls to `document.write()`
     * The HTML to be written is recorded
     * A stack trace is captured to attribute this back to an exact line in the source!
-  * Javascript [DOMSubtreeModified](http://www.w3.org/TR/DOM-Level-3-Events/#event-type-DOMSubtreeModified) Mutation Events where the target is either HTMLScriptElement or HTMLIFrameElement
+  * Javascript [DOMSubtreeModified](http://www.w3.org/TR/DOM-Level-3-Events/#event-type-DOMSubtreeModified) Mutation Events where the target is either `HTMLScriptElement` or `HTMLIFrameElement`
     * The outer HTML of the modification is recorded
-* You can configure:
-  * User-Agent - check out [useragentstring.com](http://www.useragentstring.com/) to build your own
-  * Set an amount of milliseconds to wait for subsequent Javascript requests after the initial load
-  * Lots more, `minesweeper -h`
 
 **It captures the traffic between PhantomJS and the local MITM proxy**
 * Capturing here means that the IDS has a chance to alert on HTTP request content that will never be seen in a non-proxied environment e.g. a ```<script>``` tag referencing a malicious domain that has been DNS blacklisted.
@@ -105,17 +100,16 @@ $ minesweeper ianfette.org
 * By running with a BPF filter for a specific port, we can capture the traffic of each scan separately.
 
 **It grabs any alerts from the [Suricata](http://suricata-ids.org/) IDS which is listening on localhost**
-* Alerts written in the fast format are supported /var/log/suricata/fast.log
-* Minesweeper also greps through the rules files (/etc/suricata/rules/*.rules) to find the full rule text and adds this to each alert
+* Alerts written in the fast format are supported `/var/log/suricata/fast.log`
+* Minesweeper also greps through your rules files `/etc/suricata/rules/*.rules` to find the full rule text and adds this to each alert
 
 **It also checks all URLs browsed against domain blacklists**
   * Currently, there are 2 blacklists:
       * ```google``` - [Google Safe Browsing Lookup API](https://developers.google.com/safe-browsing/lookup_guide)
       * ```malwaredomains``` - [malwaredomains.com](http://www.malwaredomains.com/)
 
-**It produces a [JSON](http://en.wikipedia.org/wiki/JSON) report**
-* If there are IDS alerts or Blacklist hits, the website is deemed ```suspicious```, otherwise it's ```ok```.
-
+**It produces a JSON report**
+* If there are IDS alerts or Blacklist hits, the website is deemed `suspicious`, otherwise it's `ok`.
 
 ## Questions
 
