@@ -33,13 +33,13 @@ Minesweeper deals with not only the problem of detecting the malware, but also a
 
 ## Usage
 
-`$ minesweeper <url>`
+`$ minesweeper [options...] <url>`
 
 Minesweeper will browse the URL and perform a security analysis.
 
-Nothing is returned if everything is `ok`. However, if the URL is flagged as `suspicious`, a JSON report is output. Use the -v (Verbose) flag to always output the report, -h (Help) for more options.
+Nothing is returned if everything is `ok`. However, if the URL is flagged as `suspicious`, a JSON report is output.
 
-A `suspicious` verdict is returned when a Minesweeper module returns a positive `hit` or `alert`.
+A `suspicious` verdict is returned when a module returns a positive `hit` or `alert`.
 
 Currently, there are 3 modules: `malwaredomains`, `google` and `suricata`.
 
