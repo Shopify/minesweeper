@@ -26,13 +26,17 @@ type Hit struct {
 	Ref           string
 }
 
-func Init(cacheDir string) (bls []Blacklist) {
+func Init(cacheDir string, modules string) (bls []Blacklist) {
 	var loadBls []Blacklist
 
 	loadBls = append(loadBls, new(Malwaredomains))
 	loadBls = append(loadBls, new(Google))
 
 	for _, bl := range loadBls {
+		if !strings.Contains(modules, bl.Name()) {
+			continue
+		}
+
 		blCacheDir := filepath.Join(cacheDir, bl.Name())
 		os.MkdirAll(blCacheDir, 0755)
 

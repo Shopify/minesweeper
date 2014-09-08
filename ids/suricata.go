@@ -18,7 +18,7 @@ type Suricata struct {
 }
 
 func (i *Suricata) Name() (name string) {
-	return "Suricata"
+	return "suricata"
 }
 
 func (i *Suricata) Init() (err error) {

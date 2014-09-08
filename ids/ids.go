@@ -3,6 +3,7 @@ package ids
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -19,15 +20,19 @@ type Alert struct {
 	Rule    string
 }
 
-func Init() (idss []Ids) {
+func Init(modules string) (idss []Ids) {
 	var loadIdss []Ids
 
 	loadIdss = append(loadIdss, new(Suricata))
 
 	for _, ids := range loadIdss {
+		if !strings.Contains(modules, ids.Name()) {
+			continue
+		}
+
 		err := ids.Init()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "WARNING [init] %s\n ", err)
+			fmt.Fprintf(os.Stderr, "WARNING [init] %s\n", err)
 			continue
 		}
 

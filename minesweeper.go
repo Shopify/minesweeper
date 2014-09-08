@@ -34,6 +34,7 @@ type MinesweeperOptions struct {
 	DefaultDir string
 	KeepRunDir bool
 	Pcap       bool
+	Modules    string
 	UserAgent  string
 	Verbose    bool
 	WaitAround int
@@ -70,7 +71,7 @@ type MinesweeperReportChange struct {
 
 func checkErr(err error, msg string) {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR [%s] %s\n ", msg, err)
+		fmt.Fprintf(os.Stderr, "ERROR [%s] %s\n", msg, err)
 		os.Exit(1)
 	}
 }
@@ -196,8 +197,8 @@ func Minesweeper(rawurl string, options *MinesweeperOptions) (bool, string) {
 
 	_, cacheDir := createBaseAndCacheDirs()
 
-	bls := blacklist.Init(cacheDir)
-	idss := ids.Init()
+	bls := blacklist.Init(cacheDir, options.Modules)
+	idss := ids.Init(options.Modules)
 
 	proxyPort := startLoProxy()
 
@@ -237,7 +238,12 @@ func Minesweeper(rawurl string, options *MinesweeperOptions) (bool, string) {
 			jsonChange := line[bytes.Index(line, []byte(" "))+1:]
 			change := MinesweeperReportChange{}
 			err := json.Unmarshal(jsonChange, &change)
-			checkErr(err, "json unmarshal change")
+			if err != nil {
+				fmt.Println(string(rawurl))
+				fmt.Println(string(rawurl) + " " + string(line))
+				os.Exit(2)
+			}
+			//checkErr(err, "json unmarshal change")
 			report.Changes = append(report.Changes, change)
 		}
 	}
@@ -275,7 +281,8 @@ func parseArgs() (string, *MinesweeperOptions) {
 
 	flag.StringVar(&options.DefaultDir, "d", "", "Specify the directory to hold the Runtime Directory (RunDir). Passed as first arg to osutil.Tempdir)")
 	flag.BoolVar(&options.KeepRunDir, "k", false, "Keep RunDir. Do not automatically remove the directory.")
-	flag.StringVar(&options.UserAgent, "u", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:31.0) Gecko/20100101 Firefox/31.0", "User-Agent")
+	flag.StringVar(&options.Modules, "m", "google,malwaredomains,suricata", "Specify what modules to run")
+	flag.StringVar(&options.UserAgent, "u", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36", "User-Agent")
 	flag.BoolVar(&options.Verbose, "v", false, "Verbose - always show the JSON report, rather than just on suspicious verdicts")
 	flag.BoolVar(&options.Pcap, "p", false, "Capture and dump traffic to a PCAP file in RunDir")
 	flag.IntVar(&options.WaitAround, "z", 100, "Wait around (ms) for Javascript to exec after page load")
