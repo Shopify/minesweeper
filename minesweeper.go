@@ -320,4 +320,8 @@ func main() {
 	if !ok || options.Verbose {
 		fmt.Printf("%s\n", report)
 	}
+
+	if !ok {
+		os.Exit(1)
+	}
 }
