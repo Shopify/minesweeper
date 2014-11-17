@@ -2,8 +2,8 @@ package main
 
 import (
 	"bytes"
-	//"crypto/sha256"
-	//"encoding/hex"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -121,7 +121,7 @@ func sniffLoDumpPcap(pcapFname string, bpf string) {
 func startLoProxy() (net.Listener, *goproxy.ProxyHttpServer, string) {
 	proxy := goproxy.NewProxyHttpServer()
 
-	/*proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
 		if resp == nil {
 			return resp
 		}
@@ -160,7 +160,7 @@ func startLoProxy() (net.Listener, *goproxy.ProxyHttpServer, string) {
 		resp.Body = ioutil.NopCloser(bytes.NewBuffer(b))
 
 		return resp
-	})*/
+	})
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	checkErr(err, "proxy listen")
@@ -170,8 +170,8 @@ func startLoProxy() (net.Listener, *goproxy.ProxyHttpServer, string) {
 
   s := &http.Server{
     Handler:        proxy,
-    ReadTimeout:    2 * time.Second,
-    WriteTimeout:   2 * time.Second,
+    ReadTimeout:    5 * time.Second,
+    WriteTimeout:   5 * time.Second,
   }
   s.SetKeepAlivesEnabled(false)
 	go s.Serve(ln)
