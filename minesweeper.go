@@ -2,8 +2,8 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
+	//"crypto/sha256"
+	//"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+  "math"
 
 	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/pcap"
@@ -30,15 +31,22 @@ import (
 	"github.com/Shopify/minesweeper/phantom"
 )
 
+var urls = []string{}
+
 type MinesweeperOptions struct {
+	Batch      bool
 	DefaultDir string
 	KeepRunDir bool
+  List       string
 	Pcap       bool
 	Modules    string
 	UserAgent  string
 	Verbose    bool
+	Workers    int
 	WaitAround int
 }
+var options = new(MinesweeperOptions)
+
 
 type MinesweeperReport struct {
 	Url       string
@@ -110,10 +118,10 @@ func sniffLoDumpPcap(pcapFname string, bpf string) {
 	}()
 }
 
-func startLoProxy() string {
+func startLoProxy() (net.Listener, *goproxy.ProxyHttpServer, string) {
 	proxy := goproxy.NewProxyHttpServer()
 
-	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+	/*proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
 		if resp == nil {
 			return resp
 		}
@@ -152,7 +160,7 @@ func startLoProxy() string {
 		resp.Body = ioutil.NopCloser(bytes.NewBuffer(b))
 
 		return resp
-	})
+	})*/
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	checkErr(err, "proxy listen")
@@ -160,9 +168,15 @@ func startLoProxy() string {
 	_, port, err := net.SplitHostPort(ln.Addr().String())
 	checkErr(err, "proxy split host port")
 
-	go http.Serve(ln, proxy)
+  s := &http.Server{
+    Handler:        proxy,
+    ReadTimeout:    2 * time.Second,
+    WriteTimeout:   2 * time.Second,
+  }
+  s.SetKeepAlivesEnabled(false)
+	go s.Serve(ln)
 
-	return port
+	return ln, proxy, port
 }
 
 func createBaseAndCacheDirs() (string, string) {
@@ -178,18 +192,22 @@ func createBaseAndCacheDirs() (string, string) {
 	return baseDir, cacheDir
 }
 
-func Minesweeper(rawurl string, options *MinesweeperOptions) (bool, string) {
+func Minesweeper(rawurl string, proxyPort string) (string, string) {
 	report := MinesweeperReport{}
 
 	createdAt := time.Now().UTC()
 
 	u, err := url.Parse(rawurl)
-	checkErr(err, "parse url")
+  if err != nil {
+    return "error", "validate url - parse"
+  }
 
 	_, err = net.LookupHost(u.Host)
-	checkErr(err, "lookup host")
+  if err != nil {
+    return "error", "validate url - lookup host"
+  }
 
-	runDir, err := ioutil.TempDir(options.DefaultDir, "minesweeper")
+  runDir, err := ioutil.TempDir(options.DefaultDir, "minesweeper")
 	checkErr(err, "create temp dir")
 
 	urlForFname := regexp.MustCompile("[^a-zA-Z0-9]").ReplaceAllString(u.String(), "_")
@@ -199,8 +217,6 @@ func Minesweeper(rawurl string, options *MinesweeperOptions) (bool, string) {
 
 	bls := blacklist.Init(cacheDir, options.Modules)
 	idss := ids.Init(options.Modules)
-
-	proxyPort := startLoProxy()
 
 	if options.Pcap {
 		sniffLoDumpPcap(minesweeperFileName+".pcap", "tcp port "+proxyPort)
@@ -213,7 +229,9 @@ func Minesweeper(rawurl string, options *MinesweeperOptions) (bool, string) {
 	startTime := time.Now().UTC()
 	args := []string{"--load-images=no", "--ignore-ssl-errors=yes", "--web-security=no", "--proxy=127.0.0.1:" + proxyPort, phantomScript, rawurl, options.UserAgent, strconv.Itoa(options.WaitAround)}
 	out, err := exec.Command("phantomjs", args...).Output()
-	checkErr(err, "exec phantomjs")
+  if err != nil {
+    return "error", "exec phantomjs " + strings.Join(args, " ")
+  }
 	endTime := time.Now().UTC()
 
 	report.CreatedAt = createdAt.Format(time.UnixDate)
@@ -228,7 +246,9 @@ func Minesweeper(rawurl string, options *MinesweeperOptions) (bool, string) {
 			jsonResource := line[bytes.Index(line, []byte(" "))+1:]
 			resource := MinesweeperReportResource{}
 			err := json.Unmarshal(jsonResource, &resource)
-			checkErr(err, "json unmarshal resource")
+      if err != nil {
+			  return "error", "json unmarshal resource: " + err.Error()
+      }
 			report.Resources = append(report.Resources, resource)
 
 			urls = append(urls, resource.Url)
@@ -238,12 +258,9 @@ func Minesweeper(rawurl string, options *MinesweeperOptions) (bool, string) {
 			jsonChange := line[bytes.Index(line, []byte(" "))+1:]
 			change := MinesweeperReportChange{}
 			err := json.Unmarshal(jsonChange, &change)
-			if err != nil {
-				fmt.Println(string(rawurl))
-				fmt.Println(string(rawurl) + " " + string(line))
-				os.Exit(2)
-			}
-			//checkErr(err, "json unmarshal change")
+      if err != nil {
+			  return "error", "json unmarshal change: " + err.Error()
+      }
 			report.Changes = append(report.Changes, change)
 		}
 	}
@@ -251,11 +268,9 @@ func Minesweeper(rawurl string, options *MinesweeperOptions) (bool, string) {
 	report.Hits = blacklist.Check(bls, urls)
 	report.Alerts = ids.Check(idss, startTime, endTime, proxyPort)
 
-	ok := true
 	report.Verdict = "ok"
 	if len(report.Hits)+len(report.Alerts) > 0 {
 		report.Verdict = "suspicious"
-		ok = false
 	}
 
 	b, err := json.MarshalIndent(report, "", "  ")
@@ -265,7 +280,7 @@ func Minesweeper(rawurl string, options *MinesweeperOptions) (bool, string) {
 	b = bytes.Replace(b, []byte("\\u0026"), []byte("&"), -1)
 	jsonReport := string(b)
 
-	err = ioutil.WriteFile(minesweeperFileName+".json", []byte(jsonReport), 0644)
+	err = ioutil.WriteFile(minesweeperFileName + "." + report.Verdict + ".json", []byte(jsonReport), 0644)
 	checkErr(err, "write json report to file")
 
 	if !options.KeepRunDir {
@@ -273,51 +288,114 @@ func Minesweeper(rawurl string, options *MinesweeperOptions) (bool, string) {
 		checkErr(err, "remove run dir")
 	}
 
-	return ok, jsonReport
+	return report.Verdict, jsonReport
 }
 
-func parseArgs() (string, *MinesweeperOptions) {
-	var options = new(MinesweeperOptions)
-
-	flag.StringVar(&options.DefaultDir, "d", "", "Specify the directory to hold the Runtime Directory (RunDir). Passed as first arg to osutil.Tempdir)")
+func parseArgs() {
+	flag.BoolVar(&options.Batch, "b", false, "Batch mode. Return a single line result.")
+	flag.StringVar(&options.DefaultDir, "d", "", "Specify the directory to hold the Runtime Directory (RunDir). Passed as first arg to osutil.Tempdir.")
 	flag.BoolVar(&options.KeepRunDir, "k", false, "Keep RunDir. Do not automatically remove the directory.")
-	flag.StringVar(&options.Modules, "m", "google,malwaredomains,suricata", "Specify what modules to run")
+	flag.StringVar(&options.List, "l", "", "URL list file, one URL per line, # to comment out.")
+	flag.StringVar(&options.Modules, "m", "google,malwaredomains,suricata", "Specify what modules to run.")
 	flag.StringVar(&options.UserAgent, "u", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36", "User-Agent")
-	flag.BoolVar(&options.Verbose, "v", false, "Verbose - always show the JSON report, rather than just on suspicious verdicts")
-	flag.BoolVar(&options.Pcap, "p", false, "Capture and dump traffic to a PCAP file in RunDir")
-	flag.IntVar(&options.WaitAround, "z", 100, "Wait around (ms) for Javascript to exec after page load")
+	flag.BoolVar(&options.Verbose, "v", false, "Verbose - always show the JSON report, rather than just on suspicious verdicts.")
+	flag.BoolVar(&options.Pcap, "p", false, "Capture and dump traffic to a PCAP file in RunDir.")
+	flag.IntVar(&options.Workers, "w", 32, "The number of URLs to (attempt to) scan in parallel.")
+	flag.IntVar(&options.WaitAround, "z", 100, "Wait around (ms) for Javascript to exec after page load.")
 
 	flag.Usage = func() {
-		fmt.Println("Usage: minesweeper [options...] <url>")
+		fmt.Println("Usage: minesweeper [options...] [url]")
 		fmt.Println("Options:")
 		flag.PrintDefaults()
 	}
 
 	flag.Parse()
 
-	rawurl := flag.Arg(0)
-	if len(rawurl) == 0 {
-		flag.Usage()
-		os.Exit(2)
-	}
-	rawurl = strings.ToLower(rawurl)
-	if !strings.HasPrefix(rawurl, "http") {
-		rawurl = "http://" + rawurl
-	}
-	if strings.Contains(rawurl, "127.0.0.1") || strings.Contains(rawurl, "localhost") {
-		fmt.Println("Sorry, you can't directly use localhost as it prevents proxying. A workaround is to create an entry in you hosts file.")
-		os.Exit(2)
-	}
+  raw_urls := []string{}
 
-	return rawurl, options
+	single_url := flag.Arg(0)
+	if len(single_url) == 0 {
+    if options.List == "" {
+		  flag.Usage()
+		  os.Exit(2)
+	  }
+  } else {
+    raw_urls = append(raw_urls, single_url)
+  }
+
+  if options.List != "" {
+    dat, err := ioutil.ReadFile(options.List)
+    checkErr(err, "read file specified by -l")
+
+    lines := bytes.Split(dat, []byte("\n"))
+    for _, line := range lines {
+      if len(line) == 0 || bytes.Index(line, []byte("#")) == 0 {
+        continue
+      }
+      raw_urls = append(raw_urls, string(line))
+    }
+  }
+
+  for _, raw_url := range raw_urls {
+    u := strings.ToLower(raw_url)
+
+    if !strings.HasPrefix(u, "http") {
+      raw_url = "http://" + raw_url
+    }
+
+    _, err := url.Parse(raw_url)
+	  if err != nil {
+      fmt.Printf("Skipping URL: [%s]. Couldn't Parse.\n", raw_url)
+      continue
+    }
+
+    if strings.Contains(u, "127.0.0.1") || strings.Contains(u, "localhost") {
+      fmt.Printf("Skipping URL: [%s]. Sorry, you can't directly use localhost as it prevents proxying. A workaround is to create an entry in you hosts file.\n", raw_url)
+      continue
+    }
+
+    urls = append(urls, raw_url)
+  }
+}
+
+func worker(id int, jobs <-chan int, results chan<- int) {
+  for j := range jobs {
+    ln, proxy, proxyPort := startLoProxy()
+    fmt.Printf("[%d] started proxy on port %s\n", id, proxyPort)
+
+    url := urls[j-1]
+	  verdict, report := Minesweeper(url, proxyPort)
+
+    proxy.Tr.CloseIdleConnections()
+    ln.Close()
+
+    if verdict == "error" {
+      fmt.Printf("[%d] %s %s %s\n", id, url, verdict, report)
+    } else {
+      fmt.Printf("[%d] %s %s\n", id, url, verdict)
+    }
+
+    results <- j * 2
+  }
 }
 
 func main() {
-	rawurl, options := parseArgs()
+	parseArgs()
 
-	ok, report := Minesweeper(rawurl, options)
+  jobs := make(chan int, len(urls))
+  results := make(chan int, len(urls))
 
-	if !ok || options.Verbose {
-		fmt.Printf("%s\n", report)
-	}
+  workers := int(math.Min(float64(options.Workers), float64(len(urls))))
+  for w := 1; w <= workers; w++ {
+    go worker(w, jobs, results)
+  }
+
+  for j := 1; j <= len(urls); j++ {
+    jobs <- j
+  }
+  close(jobs)
+
+  for a := 1; a <= len(urls); a++ {
+    <-results
+  }
 }
