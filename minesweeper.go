@@ -13,12 +13,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	//"os/exec"
 	"os/user"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"code.google.com/p/gopacket"
@@ -33,6 +33,9 @@ import (
 )
 
 var urls = []string{}
+
+var dnsCache = make(map[string]string, 0)
+var dnsCacheLock sync.RWMutex
 
 type MinesweeperOptions struct {
 	Batch      bool
@@ -127,27 +130,6 @@ func startLoProxy() (net.Listener, *goproxy.ProxyHttpServer, string) {
 			return resp
 		}
 
-		if resp.Request != nil && len(resp.Request.Host) > 0 {
-			host := resp.Request.Host
-			port := ""
-			if strings.Contains(host, ":") {
-				h, p, err := net.SplitHostPort(resp.Request.Host)
-				checkErr(err, "get remote ip split host port")
-				host = h
-				port = p
-			}
-
-			addrs, err := net.LookupHost(host)
-			if err == nil {
-				hostAddr := addrs[0]
-				if len(port) > 0 {
-					hostAddr = hostAddr + ":" + port
-				}
-
-				resp.Header.Add("Minesweeper-Host-Addr", hostAddr)
-			}
-		}
-
 		b, err := ioutil.ReadAll(resp.Body)
 		if err == nil {
 			h256 := sha256.Sum256(b)
@@ -172,7 +154,6 @@ func startLoProxy() (net.Listener, *goproxy.ProxyHttpServer, string) {
 	s := &http.Server{
 		Handler: proxy,
 	}
-	//s.SetKeepAlivesEnabled(false)
 	go s.Serve(ln)
 
 	return ln, proxy, port
@@ -199,11 +180,6 @@ func Minesweeper(rawurl string, proxyPort string) (string, string) {
 	u, err := url.Parse(rawurl)
 	if err != nil {
 		return "error", "validate url - parse"
-	}
-
-	_, err = net.LookupHost(u.Host)
-	if err != nil {
-		return "error", "validate url - lookup host"
 	}
 
 	runDir, err := ioutil.TempDir(options.DefaultDir, "minesweeper")
@@ -300,7 +276,7 @@ func parseArgs() {
 	flag.StringVar(&options.UserAgent, "u", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36", "User-Agent")
 	flag.BoolVar(&options.Verbose, "v", false, "Verbose - always show the JSON report, rather than just on suspicious verdicts.")
 	flag.BoolVar(&options.Pcap, "p", false, "Capture and dump traffic to a PCAP file in RunDir.")
-	flag.IntVar(&options.Workers, "w", 12, "The number of URLs to (attempt to) scan in parallel.")
+	flag.IntVar(&options.Workers, "w", 16, "The number of URLs to (attempt to) scan in parallel.")
 	flag.IntVar(&options.WaitAround, "z", 100, "Wait around (ms) for Javascript to exec after page load.")
 
 	flag.Usage = func() {
@@ -358,9 +334,78 @@ func parseArgs() {
 	}
 }
 
+func resolveDomain(domain string) (string, error) {
+	var host string
+	var port string
+	var ip string
+	var ok bool
+	var err error
+
+	if strings.Contains(domain, ":") {
+		host, port, err = net.SplitHostPort(domain)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		host = domain
+	}
+
+	if isIp := net.ParseIP(host); isIp != nil {
+		return domain, nil
+	}
+
+	dnsCacheLock.RLock()
+	{
+		ip, ok = dnsCache[host]
+	}
+	dnsCacheLock.RUnlock()
+
+	if !ok {
+		ips, err := net.LookupIP(host)
+		if err != nil {
+			return "", err
+		}
+
+		if len(ips) == 0 {
+			return "", fmt.Errorf("failed to lookup %s", host)
+		}
+
+		// If it's an ipv6 address we need brackets around it.
+		if ipv4 := ips[0].To4(); ipv4 != nil {
+			ip = ipv4.String()
+		} else {
+			ip = "[" + ips[0].String() + "]"
+		}
+
+		dnsCacheLock.Lock()
+		{
+			dnsCache[host] = ip
+		}
+		dnsCacheLock.Unlock()
+	}
+
+	if port != "" {
+		return ip + ":" + port, nil
+	} else {
+		return ip, nil
+	}
+}
+
+func cacheDial(network string, addr string) (net.Conn, error) {
+	url, err := resolveDomain(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	return net.Dial(network, url)
+}
+
 func worker(id int, jobs <-chan int, results chan<- int) {
 	for j := range jobs {
 		ln, proxy, proxyPort := startLoProxy()
+		proxy.Tr.DisableCompression = false
+		proxy.Tr.MaxIdleConnsPerHost = 64
+		proxy.Tr.Dial = cacheDial
 
 		url := urls[j-1]
 		verdict, report := Minesweeper(url, proxyPort)
