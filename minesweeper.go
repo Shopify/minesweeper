@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	//"math"
 	"log"
 	"net"
 	"net/http"
@@ -36,22 +35,18 @@ import (
 type ScanResponse struct {
 	Url     string
 	Verdict string
-	Report  string
+	Report  *MinesweeperReport
 }
 
 var jobs = make(chan string, 100)
 var results = make(chan int, 100)
 
-//var urls = []string{}
-
 var dnsCache = make(map[string]string, 0)
 var dnsCacheLock sync.RWMutex
 
 type MinesweeperOptions struct {
-	Batch      bool
 	DefaultDir string
 	KeepRunDir bool
-	List       string
 	Pcap       bool
 	Modules    string
 	UserAgent  string
@@ -71,6 +66,7 @@ type MinesweeperReport struct {
 	Hits      []blacklist.Hit
 	Alerts    []ids.Alert
 	Verdict   string
+	Error     string
 }
 
 type MinesweeperReportResource struct {
@@ -182,20 +178,19 @@ func createBaseAndCacheDirs() (string, string) {
 	return baseDir, cacheDir
 }
 
-func Scan(rawurl string, proxyPort string) (string, string) {
-	report := MinesweeperReport{}
-
+func Minesweeper(rawurl string) (report *MinesweeperReport) {
 	createdAt := time.Now().UTC()
+	report = &MinesweeperReport{}
 
-	u, err := url.Parse(rawurl)
-	if err != nil {
-		return "error", "validate url - parse"
-	}
+	ln, proxy, proxyPort := startLoProxy()
+	proxy.Tr.DisableCompression = false
+	proxy.Tr.MaxIdleConnsPerHost = 64
+	proxy.Tr.Dial = cacheDial
 
 	runDir, err := ioutil.TempDir(options.DefaultDir, "minesweeper")
 	checkErr(err, "create temp dir")
 
-	urlForFname := regexp.MustCompile("[^a-zA-Z0-9]").ReplaceAllString(u.String(), "_")
+	urlForFname := regexp.MustCompile("[^a-zA-Z0-9]").ReplaceAllString(rawurl, "_")
 	minesweeperFileName := filepath.Join(runDir, "minesweeper_"+createdAt.Format("20060102150405")+"_"+urlForFname)
 
 	_, cacheDir := createBaseAndCacheDirs()
@@ -216,7 +211,9 @@ func Scan(rawurl string, proxyPort string) (string, string) {
 	startTime := time.Now().UTC()
 	out, err := sh.Command("phantomjs", args).SetTimeout(time.Second * 10).Output()
 	if err != nil {
-		return "error", "exec phantomjs: " + err.Error()
+		report.Verdict = "error"
+		report.Error = "exec phantomjs: " + err.Error()
+		return
 	}
 	endTime := time.Now().UTC()
 
@@ -233,7 +230,9 @@ func Scan(rawurl string, proxyPort string) (string, string) {
 			resource := MinesweeperReportResource{}
 			err := json.Unmarshal(jsonResource, &resource)
 			if err != nil {
-				return "error", "json unmarshal resource: " + err.Error()
+				report.Verdict = "error"
+				report.Error = "json unmarshal resource: " + err.Error()
+				return
 			}
 			report.Resources = append(report.Resources, resource)
 
@@ -245,7 +244,9 @@ func Scan(rawurl string, proxyPort string) (string, string) {
 			change := MinesweeperReportChange{}
 			err := json.Unmarshal(jsonChange, &change)
 			if err != nil {
-				return "error", "json unmarshal change: " + err.Error()
+				report.Verdict = "error"
+				report.Error = "json unmarshal change: " + err.Error()
+				return
 			}
 			report.Changes = append(report.Changes, change)
 		}
@@ -274,14 +275,15 @@ func Scan(rawurl string, proxyPort string) (string, string) {
 		checkErr(err, "remove run dir")
 	}
 
-	return report.Verdict, jsonReport
+	proxy.Tr.CloseIdleConnections()
+	ln.Close()
+
+	return
 }
 
 func parseArgs() {
-	flag.BoolVar(&options.Batch, "b", false, "Batch mode. Return a single line result.")
 	flag.StringVar(&options.DefaultDir, "d", "", "Specify the directory to hold the Runtime Directory (RunDir). Passed as first arg to osutil.Tempdir.")
 	flag.BoolVar(&options.KeepRunDir, "k", false, "Keep RunDir. Do not automatically remove the directory.")
-	flag.StringVar(&options.List, "l", "", "URL list file, one URL per line, # to comment out.")
 	flag.StringVar(&options.Modules, "m", "google,malwaredomains,suricata", "Specify what modules to run.")
 	flag.StringVar(&options.UserAgent, "u", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36", "User-Agent")
 	flag.BoolVar(&options.Verbose, "v", false, "Verbose - always show the JSON report, rather than just on suspicious verdicts.")
@@ -296,52 +298,6 @@ func parseArgs() {
 	}
 
 	flag.Parse()
-
-	/*raw_urls := []string{}
-
-	single_url := flag.Arg(0)
-	if len(single_url) == 0 {
-		if options.List == "" {
-			flag.Usage()
-			os.Exit(2)
-		}
-	} else {
-		raw_urls = append(raw_urls, single_url)
-	}
-
-	if options.List != "" {
-		dat, err := ioutil.ReadFile(options.List)
-		checkErr(err, "read file specified by -l")
-
-		lines := bytes.Split(dat, []byte("\n"))
-		for _, line := range lines {
-			if len(line) == 0 || bytes.Index(line, []byte("#")) == 0 {
-				continue
-			}
-			raw_urls = append(raw_urls, string(line))
-		}
-	}
-
-	for _, raw_url := range raw_urls {
-		u := strings.ToLower(raw_url)
-
-		if !strings.HasPrefix(u, "http") {
-			raw_url = "http://" + raw_url
-		}
-
-		_, err := url.Parse(raw_url)
-		if err != nil {
-			fmt.Printf("Skipping URL: [%s]. Couldn't Parse.\n", raw_url)
-			continue
-		}
-
-		if strings.Contains(u, "127.0.0.1") || strings.Contains(u, "localhost") {
-			fmt.Printf("Skipping URL: [%s]. Sorry, you can't directly use localhost as it prevents proxying. A workaround is to create an entry in you hosts file.\n", raw_url)
-			continue
-		}
-
-		urls = append(urls, raw_url)
-	}*/
 }
 
 func resolveDomain(domain string) (string, error) {
@@ -410,33 +366,13 @@ func cacheDial(network string, addr string) (net.Conn, error) {
 	return net.Dial(network, url)
 }
 
-func MinesweeperTwo(url string) *MinesweeperResult {
-	ln, proxy, proxyPort := startLoProxy()
-	proxy.Tr.DisableCompression = false
-	proxy.Tr.MaxIdleConnsPerHost = 64
-	proxy.Tr.Dial = cacheDial
-
-	verdict, report := Scan(url, proxyPort)
-
-	proxy.Tr.CloseIdleConnections()
-	ln.Close()
-
-	result := &MinesweeperResult{Verdict: verdict, Report: report}
-	return result
-}
-
-type MinesweeperResult struct {
-	Verdict string
-	Report  string
-}
-
 type Server struct {
 	Requests chan *Request
 }
 
 type Request struct {
 	Url        string
-	ResultChan chan *MinesweeperResult
+	ResultChan chan *MinesweeperReport
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -463,27 +399,30 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	request := &Request{Url: rawurl, ResultChan: make(chan *MinesweeperResult)}
+	request := &Request{Url: rawurl, ResultChan: make(chan *MinesweeperReport)}
 	s.Requests <- request
-	result := <-request.ResultChan
+	report := <-request.ResultChan
 
 	response := ScanResponse{}
 	response.Url = rawurl
-	response.Verdict = result.Verdict
-	response.Report = result.Report
+	response.Verdict = report.Verdict
+	response.Report = report
 
 	b, err := json.MarshalIndent(response, "", "  ")
 	if err != nil {
 		http.Error(w, "Couldn't create JSON response", http.StatusInternalServerError)
 		return
 	}
+	b = bytes.Replace(b, []byte("\\u003c"), []byte("<"), -1)
+	b = bytes.Replace(b, []byte("\\u003e"), []byte(">"), -1)
+	b = bytes.Replace(b, []byte("\\u0026"), []byte("&"), -1)
 
 	w.Write(b)
 }
 
 func worker(requests chan *Request) {
 	for request := range requests {
-		report := MinesweeperTwo(request.Url)
+		report := Minesweeper(request.Url)
 		request.ResultChan <- report
 	}
 }
