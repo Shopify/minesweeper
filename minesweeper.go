@@ -8,7 +8,8 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"math"
+	//"math"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -32,7 +33,16 @@ import (
 	"github.com/Shopify/minesweeper/phantom"
 )
 
-var urls = []string{}
+type ScanResponse struct {
+	Url     string
+	Verdict string
+	Report  string
+}
+
+var jobs = make(chan string, 100)
+var results = make(chan int, 100)
+
+//var urls = []string{}
 
 var dnsCache = make(map[string]string, 0)
 var dnsCacheLock sync.RWMutex
@@ -172,7 +182,7 @@ func createBaseAndCacheDirs() (string, string) {
 	return baseDir, cacheDir
 }
 
-func Minesweeper(rawurl string, proxyPort string) (string, string) {
+func Scan(rawurl string, proxyPort string) (string, string) {
 	report := MinesweeperReport{}
 
 	createdAt := time.Now().UTC()
@@ -280,14 +290,14 @@ func parseArgs() {
 	flag.IntVar(&options.WaitAround, "z", 100, "Wait around (ms) for Javascript to exec after page load.")
 
 	flag.Usage = func() {
-		fmt.Println("Usage: minesweeper [options...] [url]")
+		fmt.Println("Usage: minesweeper [options...]")
 		fmt.Println("Options:")
 		flag.PrintDefaults()
 	}
 
 	flag.Parse()
 
-	raw_urls := []string{}
+	/*raw_urls := []string{}
 
 	single_url := flag.Arg(0)
 	if len(single_url) == 0 {
@@ -331,7 +341,7 @@ func parseArgs() {
 		}
 
 		urls = append(urls, raw_url)
-	}
+	}*/
 }
 
 func resolveDomain(domain string) (string, error) {
@@ -400,46 +410,100 @@ func cacheDial(network string, addr string) (net.Conn, error) {
 	return net.Dial(network, url)
 }
 
-func worker(id int, jobs <-chan int, results chan<- int) {
-	for j := range jobs {
-		ln, proxy, proxyPort := startLoProxy()
-		proxy.Tr.DisableCompression = false
-		proxy.Tr.MaxIdleConnsPerHost = 64
-		proxy.Tr.Dial = cacheDial
+func MinesweeperTwo(url string) *MinesweeperResult {
+	ln, proxy, proxyPort := startLoProxy()
+	proxy.Tr.DisableCompression = false
+	proxy.Tr.MaxIdleConnsPerHost = 64
+	proxy.Tr.Dial = cacheDial
 
-		url := urls[j-1]
-		verdict, report := Minesweeper(url, proxyPort)
+	verdict, report := Scan(url, proxyPort)
 
-		proxy.Tr.CloseIdleConnections()
-		ln.Close()
+	proxy.Tr.CloseIdleConnections()
+	ln.Close()
 
-		if verdict == "error" {
-			fmt.Printf("[%d] %s %s %s\n", id, url, verdict, report)
-		} else {
-			fmt.Printf("[%d] %s %s\n", id, url, verdict)
-		}
+	result := &MinesweeperResult{Verdict: verdict, Report: report}
+	return result
+}
 
-		results <- j * 2
+type MinesweeperResult struct {
+	Verdict string
+	Report  string
+}
+
+type Server struct {
+	Requests chan *Request
+}
+
+type Request struct {
+	Url        string
+	ResultChan chan *MinesweeperResult
+}
+
+func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	req.ParseForm()
+
+	if req.Form["url"] == nil {
+		http.Error(w, "Missing URL", http.StatusBadRequest)
+		return
 	}
+
+	rawurl := strings.ToLower(req.Form["url"][0])
+	if !strings.HasPrefix(rawurl, "http") {
+		rawurl = "http://" + rawurl
+	}
+
+	_, err := url.Parse(rawurl)
+	if err != nil {
+		http.Error(w, "Couldn't parse URL", http.StatusBadRequest)
+		return
+	}
+
+	if strings.Contains(rawurl, "127.0.0.1") || strings.Contains(rawurl, "localhost") {
+		http.Error(w, "Localhost prevents proxy, workaround using hosts file", http.StatusBadRequest)
+		return
+	}
+
+	request := &Request{Url: rawurl, ResultChan: make(chan *MinesweeperResult)}
+	s.Requests <- request
+	result := <-request.ResultChan
+
+	response := ScanResponse{}
+	response.Url = rawurl
+	response.Verdict = result.Verdict
+	response.Report = result.Report
+
+	b, err := json.MarshalIndent(response, "", "  ")
+	if err != nil {
+		http.Error(w, "Couldn't create JSON response", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(b)
+}
+
+func worker(requests chan *Request) {
+	for request := range requests {
+		report := MinesweeperTwo(request.Url)
+		request.ResultChan <- report
+	}
+}
+
+func workerPool(n int) chan *Request {
+	requests := make(chan *Request)
+
+	for i := 0; i < n; i++ {
+		go worker(requests)
+	}
+
+	return requests
 }
 
 func main() {
 	parseArgs()
 
-	jobs := make(chan int, len(urls))
-	results := make(chan int, len(urls))
+	requests := workerPool(options.Workers)
+	server := &Server{Requests: requests}
 
-	workers := int(math.Min(float64(options.Workers), float64(len(urls))))
-	for w := 1; w <= workers; w++ {
-		go worker(w, jobs, results)
-	}
-
-	for j := 1; j <= len(urls); j++ {
-		jobs <- j
-	}
-	close(jobs)
-
-	for a := 1; a <= len(urls); a++ {
-		<-results
-	}
+	log.Println("Listening on 0.0.0.0:6463...")
+	log.Fatal(http.ListenAndServe(":6463", server))
 }
