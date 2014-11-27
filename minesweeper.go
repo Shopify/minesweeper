@@ -21,9 +21,6 @@ import (
 	"sync"
 	"time"
 
-	"code.google.com/p/gopacket"
-	"code.google.com/p/gopacket/pcap"
-	"code.google.com/p/gopacket/pcapgo"
 	sh "github.com/codeskyblue/go-sh"
 	"github.com/elazarl/goproxy"
 
@@ -36,12 +33,8 @@ var dnsCache = make(map[string]string, 0)
 var dnsCacheLock sync.RWMutex
 
 type MinesweeperOptions struct {
-	DefaultDir string
-	KeepRunDir bool
-	Pcap       bool
 	Modules    string
 	UserAgent  string
-	Verbose    bool
 	Workers    int
 	WaitAround int
 }
@@ -54,6 +47,7 @@ type MinesweeperReport struct {
 	Error     string `json:",omitempty"`
 	CreatedAt string
 	RunDir    string
+	PcapPath  string
 	Resources []MinesweeperReportResource
 	Changes   []MinesweeperReportChange
 	Hits      []blacklist.Hit
@@ -82,40 +76,6 @@ func checkErr(err error, msg string) {
 		fmt.Fprintf(os.Stderr, "ERROR [%s] %s\n", msg, err)
 		os.Exit(1)
 	}
-}
-
-func sniffLoDumpPcap(pcapFname string, bpf string) {
-	ifs, err := pcap.FindAllDevs()
-	checkErr(err, "pcap findalldevs")
-
-	localhost := "lo"
-	for _, iface := range ifs {
-		if strings.HasPrefix(iface.Name, "lo") {
-			localhost = iface.Name
-			break
-		}
-	}
-
-	liveHandle, err := pcap.OpenLive(localhost, 65535, false, -1)
-	checkErr(err, "pcap openlive")
-
-	err = liveHandle.SetBPFFilter(bpf)
-	checkErr(err, "pcap set bpf")
-
-	go func() {
-		f, err := os.Create(pcapFname)
-		checkErr(err, "open pcap file")
-		defer f.Close()
-
-		w := pcapgo.NewWriter(f)
-		w.WriteFileHeader(65536, liveHandle.LinkType())
-
-		packetSource := gopacket.NewPacketSource(liveHandle, liveHandle.LinkType())
-		for packet := range packetSource.Packets() {
-			err = w.WritePacket(packet.Metadata().CaptureInfo, packet.Data())
-			checkErr(err, "write packet to pcap file")
-		}
-	}()
 }
 
 func startLoProxy() (net.Listener, *goproxy.ProxyHttpServer, string) {
@@ -170,15 +130,19 @@ func createBaseAndCacheDirs() (string, string) {
 
 func Minesweeper(rawurl string) (report *MinesweeperReport) {
 	createdAt := time.Now().UTC()
+
 	report = &MinesweeperReport{}
+	report.Url = rawurl
+	report.CreatedAt = createdAt.Format(time.UnixDate)
 
 	ln, proxy, proxyPort := startLoProxy()
 	proxy.Tr.DisableCompression = false
 	proxy.Tr.MaxIdleConnsPerHost = 64
 	proxy.Tr.Dial = cacheDial
 
-	runDir, err := ioutil.TempDir(options.DefaultDir, "minesweeper")
+	runDir, err := ioutil.TempDir("", "minesweeper")
 	checkErr(err, "create temp dir")
+	report.RunDir = runDir
 
 	urlForFname := regexp.MustCompile("[^a-zA-Z0-9]").ReplaceAllString(rawurl, "_")
 	minesweeperFileName := filepath.Join(runDir, "minesweeper_"+createdAt.Format("20060102150405")+"_"+urlForFname)
@@ -188,9 +152,19 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 	bls := blacklist.Init(cacheDir, options.Modules)
 	idss := ids.Init(options.Modules)
 
-	if options.Pcap {
-		sniffLoDumpPcap(minesweeperFileName+".pcap", "tcp port "+proxyPort)
-	}
+	pcapPath := minesweeperFileName + ".pcap"
+	report.PcapPath = pcapPath
+
+	tcpdumpArgs := []string{"-n", "-p", "-U", "-ilo", "-s1500", "-w" + pcapPath, "tcp port " + proxyPort}
+	tcpdump := sh.Command("tcpdump", tcpdumpArgs)
+	tcpdump.Stdout = nil
+	tcpdump.Stderr = nil
+	err = tcpdump.Start()
+	checkErr(err, "start tcpdump")
+	go func() {
+		err = tcpdump.Wait()
+		checkErr(err, "wait tcpdump")
+	}()
 
 	phantomScript := filepath.Join(runDir, "minesweeper.js")
 	err = ioutil.WriteFile(phantomScript, []byte(phantom.Script()), 0644)
@@ -200,16 +174,18 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 
 	startTime := time.Now().UTC()
 	out, err := sh.Command("phantomjs", args).SetTimeout(time.Second * 10).Output()
+	endTime := time.Now().UTC()
+
+	go func() {
+		time.Sleep(2000 * time.Millisecond)
+		tcpdump.Kill(os.Interrupt)
+	}()
+
 	if err != nil {
 		report.Verdict = "error"
 		report.Error = "exec phantomjs: " + err.Error()
 		return
 	}
-	endTime := time.Now().UTC()
-
-	report.CreatedAt = createdAt.Format(time.UnixDate)
-	report.RunDir = runDir
-	report.Url = rawurl
 
 	var urls []string
 
@@ -260,10 +236,10 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 	err = ioutil.WriteFile(minesweeperFileName+"."+report.Verdict+".json", []byte(jsonReport), 0644)
 	checkErr(err, "write json report to file")
 
-	if !options.KeepRunDir {
+	/*if report.Verdict == "ok" {
 		err = os.RemoveAll(runDir)
 		checkErr(err, "remove run dir")
-	}
+	}*/
 
 	proxy.Tr.CloseIdleConnections()
 	ln.Close()
@@ -272,14 +248,10 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 }
 
 func parseArgs() {
-	flag.StringVar(&options.DefaultDir, "d", "", "Specify the directory to hold the Runtime Directory (RunDir). Passed as first arg to osutil.Tempdir.")
-	flag.BoolVar(&options.KeepRunDir, "k", false, "Keep RunDir. Do not automatically remove the directory.")
-	flag.StringVar(&options.Modules, "m", "google,malwaredomains,suricata", "Specify what modules to run.")
+	flag.StringVar(&options.Modules, "m", "google,malwaredomains,suricata", "Module run list.")
 	flag.StringVar(&options.UserAgent, "u", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36", "User-Agent")
-	flag.BoolVar(&options.Verbose, "v", false, "Verbose - always show the JSON report, rather than just on suspicious verdicts.")
-	flag.BoolVar(&options.Pcap, "p", false, "Capture and dump traffic to a PCAP file in RunDir.")
-	flag.IntVar(&options.Workers, "w", 16, "The number of URLs to (attempt to) scan in parallel.")
-	flag.IntVar(&options.WaitAround, "z", 100, "Wait around (ms) for Javascript to exec after page load.")
+	flag.IntVar(&options.Workers, "w", 16, "Workers")
+	flag.IntVar(&options.WaitAround, "z", 100, "Zzz. Sleep for N (ms) so Javascript can exec after page load.")
 
 	flag.Usage = func() {
 		fmt.Println("Usage: minesweeper [options...]")
