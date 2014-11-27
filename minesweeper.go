@@ -52,8 +52,8 @@ type MinesweeperReport struct {
 	Verdict   string
 	Error     string `json:",omitempty"`
 	CreatedAt string
-	RunDir    string
 	PcapPath  string
+	JsonPath  string
 	Resources []MinesweeperReportResource
 	Changes   []MinesweeperReportChange
 	Hits      []blacklist.Hit
@@ -151,15 +151,12 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 
 	runDir, err := ioutil.TempDir("", "minesweeper")
 	checkErr(err, "create temp dir")
-	report.RunDir = runDir
 
 	urlForFname := regexp.MustCompile("[^a-zA-Z0-9]").ReplaceAllString(rawurl, "_")
 	minesweeperFileName := filepath.Join(runDir, "minesweeper_"+createdAt.Format("20060102150405")+"_"+urlForFname)
+	report.PcapPath = minesweeperFileName + ".pcap"
 
-	pcapPath := minesweeperFileName + ".pcap"
-	report.PcapPath = pcapPath
-
-	tcpdumpArgs := []string{"-n", "-p", "-U", "-ilo", "-s0", "-w" + pcapPath, "tcp port " + proxyPort}
+	tcpdumpArgs := []string{"-n", "-p", "-U", "-ilo", "-s0", "-w" + report.PcapPath, "tcp port " + proxyPort}
 	tcpdump := sh.Command("tcpdump", tcpdumpArgs)
 	tcpdump.Stdout = nil
 	tcpdump.Stderr = nil
@@ -230,15 +227,15 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 		report.Verdict = "suspicious"
 	}
 
-	/*b, err := json.MarshalIndent(report, "", "  ")
-	checkErr(err, "json marshal report")
+	b, err := json.MarshalIndent(report, "", "  ")
+	checkErr(err, "jsonify report")
 	b = bytes.Replace(b, []byte("\\u003c"), []byte("<"), -1)
 	b = bytes.Replace(b, []byte("\\u003e"), []byte(">"), -1)
 	b = bytes.Replace(b, []byte("\\u0026"), []byte("&"), -1)
-	jsonReport := string(b)*/
 
-	//err = ioutil.WriteFile(minesweeperFileName+"."+report.Verdict+".json", []byte(jsonReport), 0644)
-	//checkErr(err, "write json report to file")
+	report.JsonPath = minesweeperFileName + ".json"
+	err = ioutil.WriteFile(report.JsonPath, b, 0644)
+	checkErr(err, "write json report to file")
 
 	/*if report.Verdict == "ok" {
 		err = os.RemoveAll(runDir)
@@ -341,6 +338,12 @@ type Request struct {
 	ResultChan chan *MinesweeperReport
 }
 
+type Response struct {
+	Verdict  string
+	JsonPath string
+	PcapPath string
+}
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
 
@@ -369,15 +372,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	s.Requests <- request
 	report := <-request.ResultChan
 
-	b, err := json.MarshalIndent(report, "", "  ")
+	response := &Response{Verdict: report.Verdict, JsonPath: report.JsonPath, PcapPath: report.PcapPath}
+	b, err := json.MarshalIndent(response, "", "  ")
 	if err != nil {
 		http.Error(w, "Couldn't create JSON response", http.StatusInternalServerError)
 		return
 	}
-	b = bytes.Replace(b, []byte("\\u003c"), []byte("<"), -1)
-	b = bytes.Replace(b, []byte("\\u003e"), []byte(">"), -1)
-	b = bytes.Replace(b, []byte("\\u0026"), []byte("&"), -1)
-
 	w.Write(b)
 }
 
