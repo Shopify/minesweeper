@@ -32,15 +32,6 @@ import (
 	"github.com/Shopify/minesweeper/phantom"
 )
 
-type ScanResponse struct {
-	Url     string
-	Verdict string
-	Report  *MinesweeperReport
-}
-
-var jobs = make(chan string, 100)
-var results = make(chan int, 100)
-
 var dnsCache = make(map[string]string, 0)
 var dnsCacheLock sync.RWMutex
 
@@ -59,14 +50,14 @@ var options = new(MinesweeperOptions)
 
 type MinesweeperReport struct {
 	Url       string
+	Verdict   string
+	Error     string `json:",omitempty"`
 	CreatedAt string
 	RunDir    string
 	Resources []MinesweeperReportResource
 	Changes   []MinesweeperReportChange
 	Hits      []blacklist.Hit
 	Alerts    []ids.Alert
-	Verdict   string
-	Error     string
 }
 
 type MinesweeperReportResource struct {
@@ -77,7 +68,6 @@ type MinesweeperReportResource struct {
 	ContentLength          int
 	MinesweeperSha256      string `json:",omitempty"`
 	MinesweeperSniffedMime string `json:",omitempty"`
-	MinesweeperHostAddr    string `json:",omitempty"`
 	Error                  string `json:",omitempty"`
 }
 
@@ -403,12 +393,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	s.Requests <- request
 	report := <-request.ResultChan
 
-	response := ScanResponse{}
-	response.Url = rawurl
-	response.Verdict = report.Verdict
-	response.Report = report
-
-	b, err := json.MarshalIndent(response, "", "  ")
+	b, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		http.Error(w, "Couldn't create JSON response", http.StatusInternalServerError)
 		return
