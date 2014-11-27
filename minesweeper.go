@@ -29,6 +29,12 @@ import (
 	"github.com/Shopify/minesweeper/phantom"
 )
 
+var baseDir string
+var cacheDir string
+
+var bls []blacklist.Blacklist
+var idss []ids.Ids
+
 var dnsCache = make(map[string]string, 0)
 var dnsCacheLock sync.RWMutex
 
@@ -78,8 +84,16 @@ func checkErr(err error, msg string) {
 	}
 }
 
+func initModules() {
+	bls = blacklist.Init(cacheDir, options.Modules)
+	idss = ids.Init(options.Modules)
+}
+
 func startLoProxy() (net.Listener, *goproxy.ProxyHttpServer, string) {
 	proxy := goproxy.NewProxyHttpServer()
+	proxy.Tr.DisableCompression = false
+	proxy.Tr.MaxIdleConnsPerHost = 64
+	proxy.Tr.Dial = cacheDial
 
 	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
 		if resp == nil {
@@ -115,17 +129,15 @@ func startLoProxy() (net.Listener, *goproxy.ProxyHttpServer, string) {
 	return ln, proxy, port
 }
 
-func createBaseAndCacheDirs() (string, string) {
+func createBaseAndCacheDirs() {
 	usr, err := user.Current()
 	checkErr(err, "get current user")
 
-	baseDir := filepath.Join(usr.HomeDir, ".minesweeper")
+	baseDir = filepath.Join(usr.HomeDir, ".minesweeper")
 	os.MkdirAll(baseDir, 0755)
 
-	cacheDir := filepath.Join(baseDir, "cache")
+	cacheDir = filepath.Join(baseDir, "cache")
 	os.MkdirAll(cacheDir, 0755)
-
-	return baseDir, cacheDir
 }
 
 func Minesweeper(rawurl string) (report *MinesweeperReport) {
@@ -136,9 +148,6 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 	report.CreatedAt = createdAt.Format(time.UnixDate)
 
 	ln, proxy, proxyPort := startLoProxy()
-	proxy.Tr.DisableCompression = false
-	proxy.Tr.MaxIdleConnsPerHost = 64
-	proxy.Tr.Dial = cacheDial
 
 	runDir, err := ioutil.TempDir("", "minesweeper")
 	checkErr(err, "create temp dir")
@@ -147,15 +156,10 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 	urlForFname := regexp.MustCompile("[^a-zA-Z0-9]").ReplaceAllString(rawurl, "_")
 	minesweeperFileName := filepath.Join(runDir, "minesweeper_"+createdAt.Format("20060102150405")+"_"+urlForFname)
 
-	_, cacheDir := createBaseAndCacheDirs()
-
-	bls := blacklist.Init(cacheDir, options.Modules)
-	idss := ids.Init(options.Modules)
-
 	pcapPath := minesweeperFileName + ".pcap"
 	report.PcapPath = pcapPath
 
-	tcpdumpArgs := []string{"-n", "-p", "-U", "-ilo", "-s1500", "-w" + pcapPath, "tcp port " + proxyPort}
+	tcpdumpArgs := []string{"-n", "-p", "-U", "-ilo", "-s0", "-w" + pcapPath, "tcp port " + proxyPort}
 	tcpdump := sh.Command("tcpdump", tcpdumpArgs)
 	tcpdump.Stdout = nil
 	tcpdump.Stderr = nil
@@ -226,15 +230,15 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 		report.Verdict = "suspicious"
 	}
 
-	b, err := json.MarshalIndent(report, "", "  ")
+	/*b, err := json.MarshalIndent(report, "", "  ")
 	checkErr(err, "json marshal report")
 	b = bytes.Replace(b, []byte("\\u003c"), []byte("<"), -1)
 	b = bytes.Replace(b, []byte("\\u003e"), []byte(">"), -1)
 	b = bytes.Replace(b, []byte("\\u0026"), []byte("&"), -1)
-	jsonReport := string(b)
+	jsonReport := string(b)*/
 
-	err = ioutil.WriteFile(minesweeperFileName+"."+report.Verdict+".json", []byte(jsonReport), 0644)
-	checkErr(err, "write json report to file")
+	//err = ioutil.WriteFile(minesweeperFileName+"."+report.Verdict+".json", []byte(jsonReport), 0644)
+	//checkErr(err, "write json report to file")
 
 	/*if report.Verdict == "ok" {
 		err = os.RemoveAll(runDir)
@@ -396,6 +400,8 @@ func workerPool(n int) chan *Request {
 
 func main() {
 	parseArgs()
+	createBaseAndCacheDirs()
+	initModules()
 
 	requests := workerPool(options.Workers)
 	server := &Server{Requests: requests}
