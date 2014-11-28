@@ -14,8 +14,8 @@ import (
 	"net/url"
 	"os"
 	"os/user"
+	"path"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -48,12 +48,11 @@ type MinesweeperOptions struct {
 var options = new(MinesweeperOptions)
 
 type MinesweeperReport struct {
+	Id        string
 	Url       string
 	Verdict   string
 	Error     string `json:",omitempty"`
 	CreatedAt string
-	PcapPath  string
-	JsonPath  string
 	Resources []MinesweeperReportResource
 	Changes   []MinesweeperReportChange
 	Hits      []blacklist.Hit
@@ -142,6 +141,7 @@ func createBaseAndCacheDirs() {
 
 func Minesweeper(rawurl string) (report *MinesweeperReport) {
 	createdAt := time.Now().UTC()
+	yyyymmddhhmmss := createdAt.Format("20060102150405")
 
 	report = &MinesweeperReport{}
 	report.Url = rawurl
@@ -151,12 +151,13 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 
 	runDir, err := ioutil.TempDir("", "minesweeper")
 	checkErr(err, "create temp dir")
+	tokens := strings.Split(runDir, "minesweeper")
+	randDir := tokens[len(tokens)-1]
+	report.Id = yyyymmddhhmmss + "-" + randDir
 
-	urlForFname := regexp.MustCompile("[^a-zA-Z0-9]").ReplaceAllString(rawurl, "_")
-	minesweeperFileName := filepath.Join(runDir, "minesweeper_"+createdAt.Format("20060102150405")+"_"+urlForFname)
-	report.PcapPath = minesweeperFileName + ".pcap"
+	minesweeperFileName := filepath.Join(runDir, report.Id)
 
-	tcpdumpArgs := []string{"-n", "-p", "-U", "-ilo", "-s0", "-w" + report.PcapPath, "tcp port " + proxyPort}
+	tcpdumpArgs := []string{"-n", "-p", "-U", "-ilo", "-s0", "-w" + minesweeperFileName + ".pcap", "tcp port " + proxyPort}
 	tcpdump := sh.Command("tcpdump", tcpdumpArgs)
 	tcpdump.Stdout = nil
 	tcpdump.Stderr = nil
@@ -233,8 +234,7 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 	b = bytes.Replace(b, []byte("\\u003e"), []byte(">"), -1)
 	b = bytes.Replace(b, []byte("\\u0026"), []byte("&"), -1)
 
-	report.JsonPath = minesweeperFileName + ".json"
-	err = ioutil.WriteFile(report.JsonPath, b, 0644)
+	err = ioutil.WriteFile(minesweeperFileName+".json", b, 0644)
 	checkErr(err, "write json report to file")
 
 	/*if report.Verdict == "ok" {
@@ -340,45 +340,75 @@ type Request struct {
 
 type Response struct {
 	Verdict  string
-	JsonPath string
-	PcapPath string
+	ReportId string
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
 
-	if req.Form["url"] == nil {
-		http.Error(w, "Missing URL", http.StatusBadRequest)
-		return
-	}
+	if req.URL.Path == "/report" || req.URL.Path == "/pcap" {
+		if req.Form["id"] == nil {
+			http.Error(w, "Missing Id", http.StatusBadRequest)
+			return
+		}
 
-	rawurl := strings.ToLower(req.Form["url"][0])
-	if !strings.HasPrefix(rawurl, "http") {
-		rawurl = "http://" + rawurl
-	}
+		reportId := req.Form["id"][0]
+		tokens := strings.Split(reportId, "-")
+		if len(tokens) != 2 {
+			http.Error(w, "Bad Id", http.StatusBadRequest)
+			return
+		}
+		yyyymmddhhmmss := tokens[0]
+		randDir := tokens[1]
 
-	_, err := url.Parse(rawurl)
-	if err != nil {
-		http.Error(w, "Couldn't parse URL", http.StatusBadRequest)
-		return
-	}
+		p := path.Join(os.TempDir(), "minesweeper"+randDir, yyyymmddhhmmss+"-"+randDir)
+		if req.URL.Path == "/report" {
+			p = p + ".json"
+		}
+		if req.URL.Path == "/pcap" {
+			p = p + ".pcap"
+		}
 
-	if strings.Contains(rawurl, "127.0.0.1") || strings.Contains(rawurl, "localhost") {
-		http.Error(w, "Localhost prevents proxy, workaround using hosts file", http.StatusBadRequest)
-		return
-	}
+		http.ServeFile(w, req, p)
+	} else {
+		if req.URL.Path != "/scan" {
+			http.Error(w, "Unknown Path", http.StatusBadRequest)
+			return
+		}
 
-	request := &Request{Url: rawurl, ResultChan: make(chan *MinesweeperReport)}
-	s.Requests <- request
-	report := <-request.ResultChan
+		if req.Form["url"] == nil {
+			http.Error(w, "Missing URL", http.StatusBadRequest)
+			return
+		}
 
-	response := &Response{Verdict: report.Verdict, JsonPath: report.JsonPath, PcapPath: report.PcapPath}
-	b, err := json.MarshalIndent(response, "", "  ")
-	if err != nil {
-		http.Error(w, "Couldn't create JSON response", http.StatusInternalServerError)
-		return
+		rawurl := strings.ToLower(req.Form["url"][0])
+		if !strings.HasPrefix(rawurl, "http") {
+			rawurl = "http://" + rawurl
+		}
+
+		_, err := url.Parse(rawurl)
+		if err != nil {
+			http.Error(w, "Couldn't parse URL", http.StatusBadRequest)
+			return
+		}
+
+		if strings.Contains(rawurl, "127.0.0.1") || strings.Contains(rawurl, "localhost") {
+			http.Error(w, "Localhost prevents proxy, workaround using hosts file", http.StatusBadRequest)
+			return
+		}
+
+		request := &Request{Url: rawurl, ResultChan: make(chan *MinesweeperReport)}
+		s.Requests <- request
+		report := <-request.ResultChan
+
+		response := &Response{Verdict: report.Verdict, ReportId: report.Id}
+		b, err := json.MarshalIndent(response, "", "  ")
+		if err != nil {
+			http.Error(w, "Couldn't create JSON response", http.StatusInternalServerError)
+			return
+		}
+		w.Write(b)
 	}
-	w.Write(b)
 }
 
 func worker(requests chan *Request) {
