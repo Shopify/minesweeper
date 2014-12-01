@@ -11,8 +11,6 @@ Minesweeper deals with not only the problem of detecting the malware, but also a
 
   1. **Install PhantomJS**
   
-  On Mac  
-  `brew install phantomjs`  
   On Ubuntu  
   `apt-get install phantomjs`  
   Binary Install  
@@ -20,7 +18,7 @@ Minesweeper deals with not only the problem of detecting the malware, but also a
   
   2. **Install minesweeper**
     
-  Download Release "Hello World" for [Mac 64bit](https://github.com/Shopify/minesweeper/releases/download/v0.1.1/minesweeper-0.1.1-darwin-amd64.tar.gz) or [Linux 64bit](https://github.com/Shopify/minesweeper/releases/download/v0.1.1/minesweeper-0.1.1-linux-amd64.tar.gz)
+  Download Release "Hello World" for [Linux 64bit](https://github.com/Shopify/minesweeper/releases/download/v0.1.1/minesweeper-0.1.1-linux-amd64.tar.gz)
   
   3. Optional - **Grab a Google API key**
   
@@ -33,24 +31,29 @@ Minesweeper deals with not only the problem of detecting the malware, but also a
 
 ## Usage
 
-`$ minesweeper [options...] <url>`
+Start it.
 
-Minesweeper will browse the URL, perform a security analysis and produce a verdict.
+`./minesweeper` - Minesweeper listens on 0.0.0.0:6463 by default. Use -h for see options.
 
-A JSON report is returned if the verdict is `suspicious`. Nothing is returned if it's `ok`.
-
-A `suspicious` verdict means that a module has produced a positive (blacklist) `hit` or (IDS) `alert`.
-
-Currently, there are 3 modules: [`malwaredomains`](blacklist/malwaredomains.go), [`google`](blacklist/google.go) and [`suricata`](ids/suricata.go).
-
-## Example
+Scan it.
 
 ```
-$ minesweeper ianfette.org
- {
+$ curl http://localhost:6463/scan?url=ianfette.org
+{
+  "Verdict": "suspicious",
+  "ReportId": "20141201202108-214329780"
+}
+```
+
+Get JSON. 
+
+```
+$ curl http://localhost:6463/report?id=20141201202108-214329780
+{
+  "Id": "20141201202108-214329780",
   "Url": "http://ianfette.org",
-  "CreatedAt": "Wed Sep  3 22:27:40 UTC 2014",
-  "RunDir": "/var/folders/dg/m668qw1x3szdyhmt8qs0qq3w0000gn/T/minesweeper458550870",
+  "Verdict": "suspicious",
+  "CreatedAt": "Mon Dec  1 20:21:08 UTC 2014",
   "Resources": [
     {
       "Method": "GET",
@@ -59,8 +62,7 @@ $ minesweeper ianfette.org
       "ContentType": "text/html",
       "ContentLength": 43,
       "MinesweeperSha256": "0e7d00142cf0f74c7e4d5b2469c016bd421837ce692cd6a276fce2f3d5fc3a06",
-      "MinesweeperSniffedMime": "text/html; charset=utf-8",
-      "MinesweeperHostAddr": "173.201.140.128"
+      "MinesweeperSniffedMime": "text/html; charset=utf-8"
     }
   ],
   "Changes": null,
@@ -73,12 +75,25 @@ $ minesweeper ianfette.org
       "Ref": "https://developers.google.com/safe-browsing/developers_guide_v3"
     }
   ],
-  "Alerts": null,
-  "Verdict": "suspicious"
+  "Alerts": null
 }
 ```
 
+Get PCAP.
+
+```
+$ curl http://localhost:6463/pcap?id=20141201202108-214329780 > foo.pcap
+$ file foo.pcap
+foo.pcap: tcpdump capture file (little-endian) - version 2.4 (Ethernet, capture length 65535)
+```
+
 ## How does it work?
+
+Minesweeper will scan the URL, perform a security analysis and produce a verdict of `suspicious` or `ok`.
+
+A `suspicious` verdict means that a module has produced a positive (blacklist) `hit` or (IDS) `alert`.
+
+Currently, there are 3 modules: [`malwaredomains`](blacklist/malwaredomains.go), [`google`](blacklist/google.go) and [`suricata`](ids/suricata.go).
 
 **Minesweeper scans websites using [PhantomJS](http://phantomjs.org/) through a local MITM proxy**
 
@@ -113,4 +128,4 @@ $ minesweeper ianfette.org
 
 ## Questions
 
-Please contact [falsenegative](https://github.com/falsenegative)
+Don't suffer, just ask! [falsenegative](https://github.com/falsenegative)
