@@ -89,7 +89,7 @@ foo.pcap: tcpdump capture file (little-endian) - version 2.4 (Ethernet, capture 
 
 ## How does it work?
 
-Minesweeper will scan the URL, perform a security analysis and produce a verdict of `suspicious` or `ok`.
+Minesweeper will scan a URL, perform a security analysis and say it's `suspicious` or `ok`.
 
 A `suspicious` verdict means that a module has produced a positive (blacklist) `hit` or (IDS) `alert`.
 
