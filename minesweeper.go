@@ -39,6 +39,7 @@ var dnsCache = make(map[string]string, 0)
 var dnsCacheLock sync.RWMutex
 
 type MinesweeperOptions struct {
+	Expiry     int
 	Modules    string
 	UserAgent  string
 	Workers    int
@@ -237,10 +238,7 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 	err = ioutil.WriteFile(minesweeperFileName+".json", b, 0644)
 	checkErr(err, "write json report to file")
 
-	/*if report.Verdict == "ok" {
-		err = os.RemoveAll(runDir)
-		checkErr(err, "remove run dir")
-	}*/
+	expireResults()
 
 	proxy.Tr.CloseIdleConnections()
 	ln.Close()
@@ -251,6 +249,7 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 func parseArgs() {
 	flag.StringVar(&options.Modules, "m", "google,malwaredomains,suricata", "Module run list.")
 	flag.StringVar(&options.UserAgent, "u", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36", "User-Agent")
+	flag.IntVar(&options.Expiry, "e", 24, "Expire results after N hours")
 	flag.IntVar(&options.Workers, "w", 16, "Workers")
 	flag.IntVar(&options.WaitAround, "z", 100, "Zzz. Sleep for N (ms) so Javascript can exec after page load.")
 
@@ -428,14 +427,27 @@ func workerPool(n int) chan *Request {
 	return requests
 }
 
+func expireResults() {
+	go func() {
+		matches, _ := filepath.Glob(path.Join(os.TempDir(), "minesweeper*"))
+		for _, match := range matches {
+			fi, _ := os.Stat(match)
+			if fi.Mode().IsDir() && fi.ModTime().Add(time.Duration(options.Expiry)*time.Hour).Before(time.Now().UTC()) {
+				os.RemoveAll(match)
+			}
+		}
+	}()
+}
+
 func main() {
 	parseArgs()
 	createBaseAndCacheDirs()
+	expireResults()
 	initModules()
 
 	requests := workerPool(options.Workers)
 	server := &Server{Requests: requests}
 
-	log.Println("Listening on 0.0.0.0:6463...")
+	fmt.Println("Listening on 0.0.0.0:6463...")
 	log.Fatal(http.ListenAndServe(":6463", server))
 }
