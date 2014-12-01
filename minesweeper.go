@@ -247,8 +247,8 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 }
 
 func parseArgs() {
-	flag.StringVar(&options.Modules, "m", "google,malwaredomains,suricata", "Module run list.")
-	flag.StringVar(&options.UserAgent, "u", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36", "User-Agent")
+	flag.StringVar(&options.Modules, "m", "google,malwaredomains,suricata", "Module run list")
+	flag.StringVar(&options.UserAgent, "u", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.65 Safari/537.36", "User-Agent")
 	flag.IntVar(&options.Expiry, "e", 24, "Expire results after N hours")
 	flag.IntVar(&options.Workers, "w", 16, "Workers")
 	flag.IntVar(&options.WaitAround, "z", 100, "Zzz. Sleep for N (ms) so Javascript can exec after page load.")
