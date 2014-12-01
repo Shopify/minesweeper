@@ -39,8 +39,10 @@ var dnsCache = make(map[string]string, 0)
 var dnsCacheLock sync.RWMutex
 
 type MinesweeperOptions struct {
+	Binding    string
 	Expiry     int
 	Modules    string
+	Port       string
 	UserAgent  string
 	Workers    int
 	WaitAround int
@@ -247,9 +249,11 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 }
 
 func parseArgs() {
-	flag.StringVar(&options.Modules, "m", "google,malwaredomains,suricata", "Module run list")
-	flag.StringVar(&options.UserAgent, "u", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.65 Safari/537.36", "User-Agent")
+	flag.StringVar(&options.Binding, "b", "0.0.0.0", "Binds to the specified IP")
 	flag.IntVar(&options.Expiry, "e", 24, "Expire results after N hours")
+	flag.StringVar(&options.Modules, "m", "google,malwaredomains,suricata", "Module run list")
+	flag.StringVar(&options.Port, "p", "6463", "Runs on the specified port")
+	flag.StringVar(&options.UserAgent, "u", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.65 Safari/537.36", "User-Agent")
 	flag.IntVar(&options.Workers, "w", 16, "Workers")
 	flag.IntVar(&options.WaitAround, "z", 100, "Zzz. Sleep for N (ms) so Javascript can exec after page load.")
 
@@ -342,19 +346,26 @@ type Response struct {
 	ReportId string
 }
 
+func logHttpError(req *http.Request, w http.ResponseWriter, errorMessage string, code int) {
+	log.Printf("%d %s [%s %s]\n", code, errorMessage, req.Method, req.URL.String())
+	http.Error(w, errorMessage, code)
+}
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	log.Println(req.Method + " " + req.URL.String())
+
 	req.ParseForm()
 
 	if req.URL.Path == "/report" || req.URL.Path == "/pcap" {
 		if req.Form["id"] == nil {
-			http.Error(w, "Missing Id", http.StatusBadRequest)
+			logHttpError(req, w, "Missing Id", http.StatusBadRequest)
 			return
 		}
 
 		reportId := req.Form["id"][0]
 		tokens := strings.Split(reportId, "-")
 		if len(tokens) != 2 {
-			http.Error(w, "Bad Id", http.StatusBadRequest)
+			logHttpError(req, w, "Bad Id", http.StatusBadRequest)
 			return
 		}
 		yyyymmddhhmmss := tokens[0]
@@ -368,15 +379,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			p = p + ".pcap"
 		}
 
+		log.Printf("%d [%s %s]\n", 200, req.Method, req.URL.String())
 		http.ServeFile(w, req, p)
 	} else {
 		if req.URL.Path != "/scan" {
-			http.Error(w, "Unknown Path", http.StatusBadRequest)
+			logHttpError(req, w, "Unknown Path", http.StatusBadRequest)
 			return
 		}
 
 		if req.Form["url"] == nil {
-			http.Error(w, "Missing URL", http.StatusBadRequest)
+			logHttpError(req, w, "Missing URL", http.StatusBadRequest)
 			return
 		}
 
@@ -387,12 +399,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		_, err := url.Parse(rawurl)
 		if err != nil {
-			http.Error(w, "Couldn't parse URL", http.StatusBadRequest)
+			logHttpError(req, w, "Couldn't parse URL", http.StatusBadRequest)
 			return
 		}
 
 		if strings.Contains(rawurl, "127.0.0.1") || strings.Contains(rawurl, "localhost") {
-			http.Error(w, "Localhost prevents proxy, workaround using hosts file", http.StatusBadRequest)
+			logHttpError(req, w, "Localhost prevents proxy, workaround using hosts file", http.StatusBadRequest)
 			return
 		}
 
@@ -403,9 +415,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		response := &Response{Verdict: report.Verdict, ReportId: report.Id}
 		b, err := json.MarshalIndent(response, "", "  ")
 		if err != nil {
-			http.Error(w, "Couldn't create JSON response", http.StatusInternalServerError)
+			logHttpError(req, w, "Couldn't create JSON response", http.StatusInternalServerError)
 			return
 		}
+
+		log.Printf("%d %s %s [%s %s]\n", 200, report.Verdict, report.Id, req.Method, req.URL.String())
 		w.Write(b)
 	}
 }
@@ -448,6 +462,7 @@ func main() {
 	requests := workerPool(options.Workers)
 	server := &Server{Requests: requests}
 
-	fmt.Println("Listening on 0.0.0.0:6463...")
-	log.Fatal(http.ListenAndServe(":6463", server))
+	listenOn := options.Binding + ":" + options.Port
+	log.Printf("Listening on %s...\n", listenOn)
+	log.Fatal(http.ListenAndServe(listenOn, server))
 }
