@@ -379,8 +379,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			p = p + ".pcap"
 		}
 
-		log.Printf("%d [%s %s]\n", 200, req.Method, req.URL.String())
-		http.ServeFile(w, req, p)
+		if _, err := os.Stat(p); os.IsNotExist(err) {
+			logHttpError(req, w, "Report expired or bad id", http.StatusBadRequest)
+		} else {
+			log.Printf("%d [%s %s]\n", 200, req.Method, req.URL.String())
+			http.ServeFile(w, req, p)
+		}
 	} else {
 		if req.URL.Path != "/scan" {
 			logHttpError(req, w, "Unknown Path", http.StatusBadRequest)
