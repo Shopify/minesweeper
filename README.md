@@ -33,7 +33,9 @@ Minesweeper deals with not only the problem of detecting the malware, but also a
 
 Start it.
 
-`./minesweeper` - Minesweeper listens on 0.0.0.0:6463 by default. Use -h for see options.
+`./minesweeper` - Minesweeper listens on 127.0.0.1:6463 by default.
+
+In production, it is suggested that you run Minesweeper as a non-root user behind a reverse proxy such as nginx.
 
 Scan it.
 

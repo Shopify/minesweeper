@@ -249,7 +249,7 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 }
 
 func parseArgs() {
-	flag.StringVar(&options.Binding, "b", "0.0.0.0", "Binds to the specified IP")
+	flag.StringVar(&options.Binding, "b", "127.0.0.1", "Binds to the specified IP")
 	flag.IntVar(&options.Expiry, "e", 24, "Expire results after N hours")
 	flag.StringVar(&options.Modules, "m", "google,malwaredomains,suricata", "Module run list")
 	flag.StringVar(&options.Port, "p", "6463", "Runs on the specified port")
