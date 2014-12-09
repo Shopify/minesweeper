@@ -42,8 +42,9 @@ sudo vim /etc/suricata/suricata.yaml
 > host-os-policy.linux: [0.0.0.0/0]
 ```
 
-Start
+Set to run on boot and start
 ```
+sudo update-rc.d suricata defaults
 sudo service suricata start
 ```
 
