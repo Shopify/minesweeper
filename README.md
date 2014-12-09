@@ -36,10 +36,10 @@ sudo vim /etc/suricata/suricata.yaml
 > af-packet.interface: lo
 > outputs.fast.enabled: yes
 > HOME_NET="127.0.0.1"
-> EXTERNAL_NET="127.0.0.1" in /etc/suricata/suricata.yaml
-> HTTP_PORTS="1024:" in /etc/suricata/suricata.yaml
-> host-os-policy.windows: [] in /etc/suricata/suricata.yaml
-> host-os-policy.linux: [0.0.0.0/0] in /etc/suricata/suricata.yaml
+> EXTERNAL_NET="127.0.0.1"
+> HTTP_PORTS="1024:"
+> host-os-policy.windows: []
+> host-os-policy.linux: [0.0.0.0/0]
 ```
 
 Start
