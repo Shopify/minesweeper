@@ -82,9 +82,13 @@ Install binary
 sudo cp minesweeper /usr/local/bin/
 ```
 
-Edit and Install upstart script
+Edit upstart script (minesweeper.conf)
 ```
-set "env MINESWEEPER_GOOGLE_API_KEY=" to your Google API Key in /etc/init/minesweeper.conf
+env MINESWEEPER_GOOGLE_API_KEY=your_google_api_key
+```
+
+Install upstart script
+```
 sudo cp minesweeper.conf /etc/init/
 ```
 
