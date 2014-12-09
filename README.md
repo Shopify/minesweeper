@@ -3,10 +3,10 @@ minesweeper
 
 Minesweeper scans websites to detect drive-by malware.
 
-[Install](#install)
-[Test](#test)
-[How it works](#howitworks)
-[Questions](#questions)
+[Install](#install)  
+[Test](#test)  
+[How it works](#howitworks)  
+[Questions](#questions)  
 
 ----------------------------------------------------
 
