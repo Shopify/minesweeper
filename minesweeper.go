@@ -175,7 +175,7 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 	err = ioutil.WriteFile(phantomScript, []byte(phantom.Script()), 0644)
 	checkErr(err, "write phantom script to base dir")
 
-	args := []string{"--load-images=no", "--ignore-ssl-errors=yes", "--web-security=no", "--proxy=127.0.0.1:" + proxyPort, phantomScript, rawurl, options.UserAgent, strconv.Itoa(options.WaitAround)}
+	args := []string{"--load-images=no", "--ignore-ssl-errors=yes", "--ssl-protocol=any", "--web-security=no", "--proxy=127.0.0.1:" + proxyPort, phantomScript, rawurl, options.UserAgent, strconv.Itoa(options.WaitAround)}
 
 	startTime := time.Now().UTC()
 	out, err := sh.Command("phantomjs", args).SetTimeout(time.Second * 10).Output()
@@ -423,7 +423,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		log.Printf("%d %s %s [%s %s]\n", 200, report.Verdict, report.Id, req.Method, req.URL.String())
+		log.Printf("%d %s %s [%s %s] %s\n", 200, report.Verdict, report.Id, req.Method, req.URL.String(), report.Error)
 		w.Write(b)
 	}
 }
