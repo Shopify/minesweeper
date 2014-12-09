@@ -14,13 +14,6 @@ Minesweeper scans websites to detect drive-by malware.
 
 This guide is for Ubuntu 14.04, non-root user with sudo privilege.
 
-### Nginx
-
-Install nginx as a reverse proxy so that we don't have to run minesweeper as root
-```
-sudo apt-get install nginx
-```
-
 ### PhantomJS
 
 Install phantomjs, minesweeper's headless browser of choice
@@ -99,11 +92,36 @@ Start minesweeper
 sudo service minesweeper start
 ```
 
+Minesweeper should now be listening on 127.0.0.1:6463.
+
+### Nginx
+
+Install nginx as a reverse proxy so that we don't have to run minesweeper as root
+```
+sudo apt-get install nginx
+```
+
+Configure nginx to proxy requests to minesweeper
+```
+sudo vim /etc/nginx/sites-enabled/default
+> server_name your_ip_or_hostname
+>
+> location / {
+>   proxy_set_header X-Real-IP $remote_addr;
+>   proxy_set_header X-Forwarded-For $remote_addr;
+>   proxy_set_header Host $host;
+>   proxy_pass http://127.0.0.1:6463;
+> }
+```
+
+Restart nginx
+```
+sudo service nginx restart
+```
+
 ----------------------------------------------------
 
 ## <a name="test"></a> Test
-
-Minesweeper listens on 127.0.0.1:6463 by default.
 
 E.g. Scan it.
 ```
