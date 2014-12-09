@@ -53,16 +53,16 @@ Start Suricata
 sudo service suricata start
 ```
 
-### Google
-
-Grab a Google API key from https://developers.google.com/safe-browsing/lookup_guide#GettingStarted
-
 ### tcpdump
 
 Allow a non-root user to capture with tcpdump
 ```
 sudo setcap "cap_net_raw+eip" /usr/sbin/tcpdump
 ```
+
+### Google
+
+Grab a Google API key from https://developers.google.com/safe-browsing/lookup_guide#GettingStarted
 
 ### Minesweeper
 
