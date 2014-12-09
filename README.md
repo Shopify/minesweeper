@@ -62,13 +62,13 @@ Grab a Google API key from https://developers.google.com/safe-browsing/lookup_gu
 
 Download
 ```
-curl -O https://github.com/Shopify/minesweeper/releases/download/0.2.0/minesweeper-0.2.0-linux-amd64.tar.gz
+curl -O https://github.com/Shopify/minesweeper/releases/download/0.2.1/minesweeper-0.2.1-linux-amd64.tar.gz
 ```
 
 Extract and cd
 ```
-tar xzf minesweeper-0.2.0-linux-amd64.tar.gz
-cd minesweeper-0.2.0-linux-amd64
+tar xzf minesweeper-0.2.1-linux-amd64.tar.gz
+cd minesweeper-0.2.1-linux-amd64
 ```
 
 Install binary
