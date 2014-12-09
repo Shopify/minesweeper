@@ -48,6 +48,11 @@ sudo update-rc.d suricata defaults
 sudo service suricata start
 ```
 
+Give minesweeper read permission to the suricata alerts file
+```
+chmod a+r /var/log/suricata/fast.log
+```
+
 ### tcpdump
 
 Allow a non-root user to capture with tcpdump
