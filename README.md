@@ -50,7 +50,7 @@ sudo service suricata start
 
 Give minesweeper read permission to the suricata alerts file
 ```
-chmod a+r /var/log/suricata/fast.log
+sudo chmod a+r /var/log/suricata/fast.log
 ```
 
 ### tcpdump
