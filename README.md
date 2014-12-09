@@ -92,7 +92,7 @@ Start minesweeper
 sudo service minesweeper start
 ```
 
-Minesweeper should now be listening on 127.0.0.1:6463.
+Minesweeper should now be listening on `127.0.0.1:6463`, logging to `/var/log/minesweeper.log`.
 
 ### Nginx
 
