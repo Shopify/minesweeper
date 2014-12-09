@@ -76,7 +76,7 @@ https://developers.google.com/safe-browsing/lookup_guide#GettingStarted
 
 Download
 ```
-curl -O https://github.com/Shopify/minesweeper/releases/download/0.2.2/minesweeper-0.2.2-linux-amd64.tar.gz
+wget https://github.com/Shopify/minesweeper/releases/download/0.2.2/minesweeper-0.2.2-linux-amd64.tar.gz
 ```
 
 Extract and cd
