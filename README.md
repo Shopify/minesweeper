@@ -1,43 +1,96 @@
 minesweeper
 ===========
 
-Minesweeper is a tool to detect websites infected with drive-by malware.
+Minesweeper scans websites to detect drive-by malware.
 
-[Shopify](https://github.com/Shopify) uses Minesweeper to protect its 100,000+ online stores from web-based malware infections.
+### Install
 
-Minesweeper deals with not only the problem of detecting the malware, but also attributing an infection back to a particular asset. It is designed for high speed, parallel operation.
+# These docs are for Ubuntu 14.04 and are for a non-root user with sudo privilege.
 
-## Install
+## Nginx
 
-  1. **Install PhantomJS**
-  
-  On Ubuntu  
-  `apt-get install phantomjs`  
-  Binary Install  
-  ``http://phantomjs.org/download.html``
-  
-  2. **Install minesweeper**
-    
-  Download Release "s/cmd/api/" for [Linux 64bit](https://github.com/Shopify/minesweeper/releases/download/0.2.0/minesweeper-0.2.0-linux-amd64.tar.gz)
-  
-  3. Optional - **Grab a Google API key**
-  
-  Setup a Google API key by following [these intructions](https://developers.google.com/safe-browsing/lookup_guide#GettingStarted).  
-  Add the key as an ENV variable e.g. `export MINESWEEPER_GOOGLE_API_KEY="<YOUR_KEY>"`
+# Install nginx as a reverse proxy so that we don't have to run minesweeper as root
+```
+sudo apt-get install nginx
+```
 
-  4. Optional - **Install Suricata**
-  
-  Instructions and sample config coming soon.
+## PhantomJS
 
-## Usage
+# Install phantomjs, minesweeper's headless browser of choice
+```
+sudo apt-get install phantomjs
+```
 
-Start it.
+## Suricata
 
-`./minesweeper` - Minesweeper listens on 127.0.0.1:6463 by default.
+# Install suricata + emerging threats rules
+```
+sudo add-apt-repository ppa:oisf/suricata-stable
+sudo apt-get update
+sudo apt-get install suricata
+```
 
-In production, it is suggested that you run Minesweeper as a non-root user behind a reverse proxy such as nginx.
+# Edit /etc/suricata/suricata.yaml
+```
+af-packet.interface: lo
+outputs.fast.enabled: yes
+HOME_NET="127.0.0.1"
+EXTERNAL_NET="127.0.0.1" in /etc/suricata/suricata.yaml
+HTTP_PORTS="1024:" in /etc/suricata/suricata.yaml
+host-os-policy.windows: [] in /etc/suricata/suricata.yaml
+host-os-policy.linux: [0.0.0.0/0] in /etc/suricata/suricata.yaml
+```
 
-Scan it.
+# Start Suricata
+```
+sudo service suricata start
+```
+
+## Google
+
+# Grab a Google API key from https://developers.google.com/safe-browsing/lookup_guide#GettingStarted
+
+## tcpdump
+
+# Allow a non-root user to capture with tcpdump
+```
+sudo setcap "cap_net_raw+eip" /usr/sbin/tcpdump
+```
+
+## Minesweeper
+
+# Download
+```
+curl -O https://github.com/Shopify/minesweeper/releases/download/0.2.0/minesweeper-0.2.0-linux-amd64.tar.gz
+```
+
+# Extract
+```
+tar xzf minesweeper-0.2.0-linux-amd64.tar.gz
+cd minesweeper-0.2.0-linux-amd64
+```
+
+# Install binary
+```
+sudo cp minesweeper /usr/local/bin/
+```
+
+# Edit and Install upstart script
+```
+set "env MINESWEEPER_GOOGLE_API_KEY=" to your Google API Key in /etc/init/minesweeper.conf
+sudo cp minesweeper.conf /etc/init/
+```
+
+# Start minesweeper
+```
+sudo service minesweeper start
+```
+
+### Test
+
+Minesweeper listens on 127.0.0.1:6463 by default.
+
+E.g. Scan it.
 
 ```
 $ curl http://localhost:6463/scan?url=ianfette.org
@@ -47,7 +100,7 @@ $ curl http://localhost:6463/scan?url=ianfette.org
 }
 ```
 
-Get JSON. 
+E.g. Get Report.
 
 ```
 $ curl http://localhost:6463/report?id=20141201202108-214329780
@@ -81,7 +134,7 @@ $ curl http://localhost:6463/report?id=20141201202108-214329780
 }
 ```
 
-Get PCAP.
+E.g. Get PCAP.
 
 ```
 $ curl http://localhost:6463/pcap?id=20141201202108-214329780 > foo.pcap
@@ -89,7 +142,7 @@ $ file foo.pcap
 foo.pcap: tcpdump capture file (little-endian) - version 2.4 (Ethernet, capture length 65535)
 ```
 
-## How does it work?
+### How does it work?
 
 Minesweeper will scan a URL, perform a security analysis and say it's `suspicious` or `ok`.
 
@@ -128,6 +181,6 @@ Currently, there are 3 modules: [`malwaredomains`](blacklist/malwaredomains.go),
 **It produces a JSON report**
 * If there are IDS alerts or Blacklist hits, the website is deemed `suspicious`, otherwise it's `ok`.
 
-## Questions
+### Questions/Suggestions
 
 Don't suffer, just ask! [falsenegative](https://github.com/falsenegative)
