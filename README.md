@@ -3,25 +3,25 @@ minesweeper
 
 Minesweeper scans websites to detect drive-by malware.
 
-# Install
+## Install
 
 These docs are for Ubuntu 14.04 and are for a non-root user with sudo privilege.
 
-## Nginx
+### Nginx
 
 Install nginx as a reverse proxy so that we don't have to run minesweeper as root
 ```
 sudo apt-get install nginx
 ```
 
-## PhantomJS
+### PhantomJS
 
 Install phantomjs, minesweeper's headless browser of choice
 ```
 sudo apt-get install phantomjs
 ```
 
-## Suricata
+### Suricata
 
 Install suricata + emerging threats rules
 ```
@@ -46,18 +46,18 @@ Start Suricata
 sudo service suricata start
 ```
 
-## Google
+### Google
 
 Grab a Google API key from https://developers.google.com/safe-browsing/lookup_guide#GettingStarted
 
-## tcpdump
+### tcpdump
 
 Allow a non-root user to capture with tcpdump
 ```
 sudo setcap "cap_net_raw+eip" /usr/sbin/tcpdump
 ```
 
-## Minesweeper
+### Minesweeper
 
 Download
 ```
@@ -86,7 +86,7 @@ Start minesweeper
 sudo service minesweeper start
 ```
 
-# Test
+## Test
 
 Minesweeper listens on 127.0.0.1:6463 by default.
 
@@ -139,7 +139,7 @@ $ file foo.pcap
 foo.pcap: tcpdump capture file (little-endian) - version 2.4 (Ethernet, capture length 65535)
 ```
 
-# How does it work?
+## How does it work?
 
 Minesweeper will scan a URL, perform a security analysis and say it's `suspicious` or `ok`.
 
@@ -178,6 +178,6 @@ Currently, there are 3 modules: [`malwaredomains`](blacklist/malwaredomains.go),
 **It produces a JSON report**
 * If there are IDS alerts or Blacklist hits, the website is deemed `suspicious`, otherwise it's `ok`.
 
-### Questions/Suggestions
+## Questions/Suggestions
 
 Don't suffer, just ask! [falsenegative](https://github.com/falsenegative)
