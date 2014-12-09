@@ -76,13 +76,13 @@ https://developers.google.com/safe-browsing/lookup_guide#GettingStarted
 
 Download
 ```
-curl -O https://github.com/Shopify/minesweeper/releases/download/0.2.1/minesweeper-0.2.1-linux-amd64.tar.gz
+curl -O https://github.com/Shopify/minesweeper/releases/download/0.2.2/minesweeper-0.2.2-linux-amd64.tar.gz
 ```
 
 Extract and cd
 ```
-tar xzf minesweeper-0.2.1-linux-amd64.tar.gz
-cd minesweeper-0.2.1-linux-amd64
+tar xzf minesweeper-0.2.2-linux-amd64.tar.gz
+cd minesweeper-0.2.2-linux-amd64
 ```
 
 Install binary
