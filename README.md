@@ -62,7 +62,8 @@ sudo setcap "cap_net_raw+eip" /usr/sbin/tcpdump
 
 ### Google
 
-Grab a Google API key from https://developers.google.com/safe-browsing/lookup_guide#GettingStarted
+Grab a Google API key, you'll need it soon  
+https://developers.google.com/safe-browsing/lookup_guide#GettingStarted
 
 ### Minesweeper
 
