@@ -3,9 +3,16 @@ minesweeper
 
 Minesweeper scans websites to detect drive-by malware.
 
-## Install
+[Install](#install)
+[Test](#test)
+[How it works](#howitworks)
+[Questions](#questions)
 
-These docs are for Ubuntu 14.04 and are for a non-root user with sudo privilege.
+----------------------------------------------------
+
+## <a name="install"></a> Install
+
+This guide is for Ubuntu 14.04, non-root user with sudo privilege.
 
 ### Nginx
 
@@ -86,7 +93,9 @@ Start minesweeper
 sudo service minesweeper start
 ```
 
-## Test
+----------------------------------------------------
+
+## <a name="test"></a> Test
 
 Minesweeper listens on 127.0.0.1:6463 by default.
 
@@ -139,7 +148,9 @@ $ file foo.pcap
 foo.pcap: tcpdump capture file (little-endian) - version 2.4 (Ethernet, capture length 65535)
 ```
 
-## How does it work?
+----------------------------------------------------
+
+## <a name="howitworks"></a> How it works
 
 Minesweeper will scan a URL, perform a security analysis and say it's `suspicious` or `ok`.
 
@@ -178,6 +189,8 @@ Currently, there are 3 modules: [`malwaredomains`](blacklist/malwaredomains.go),
 **It produces a JSON report**
 * If there are IDS alerts or Blacklist hits, the website is deemed `suspicious`, otherwise it's `ok`.
 
-## Questions/Suggestions
+----------------------------------------------------
+
+## <a name="questions"></a> Questions
 
 Don't suffer, just ask! [falsenegative](https://github.com/falsenegative)
