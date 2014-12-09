@@ -3,34 +3,34 @@ minesweeper
 
 Minesweeper scans websites to detect drive-by malware.
 
-### Install
+# Install
 
-# These docs are for Ubuntu 14.04 and are for a non-root user with sudo privilege.
+These docs are for Ubuntu 14.04 and are for a non-root user with sudo privilege.
 
 ## Nginx
 
-# Install nginx as a reverse proxy so that we don't have to run minesweeper as root
+Install nginx as a reverse proxy so that we don't have to run minesweeper as root
 ```
 sudo apt-get install nginx
 ```
 
 ## PhantomJS
 
-# Install phantomjs, minesweeper's headless browser of choice
+Install phantomjs, minesweeper's headless browser of choice
 ```
 sudo apt-get install phantomjs
 ```
 
 ## Suricata
 
-# Install suricata + emerging threats rules
+Install suricata + emerging threats rules
 ```
 sudo add-apt-repository ppa:oisf/suricata-stable
 sudo apt-get update
 sudo apt-get install suricata
 ```
 
-# Edit /etc/suricata/suricata.yaml
+Edit /etc/suricata/suricata.yaml
 ```
 af-packet.interface: lo
 outputs.fast.enabled: yes
@@ -41,57 +41,56 @@ host-os-policy.windows: [] in /etc/suricata/suricata.yaml
 host-os-policy.linux: [0.0.0.0/0] in /etc/suricata/suricata.yaml
 ```
 
-# Start Suricata
+Start Suricata
 ```
 sudo service suricata start
 ```
 
 ## Google
 
-# Grab a Google API key from https://developers.google.com/safe-browsing/lookup_guide#GettingStarted
+Grab a Google API key from https://developers.google.com/safe-browsing/lookup_guide#GettingStarted
 
 ## tcpdump
 
-# Allow a non-root user to capture with tcpdump
+Allow a non-root user to capture with tcpdump
 ```
 sudo setcap "cap_net_raw+eip" /usr/sbin/tcpdump
 ```
 
 ## Minesweeper
 
-# Download
+Download
 ```
 curl -O https://github.com/Shopify/minesweeper/releases/download/0.2.0/minesweeper-0.2.0-linux-amd64.tar.gz
 ```
 
-# Extract
+Extract
 ```
 tar xzf minesweeper-0.2.0-linux-amd64.tar.gz
 cd minesweeper-0.2.0-linux-amd64
 ```
 
-# Install binary
+Install binary
 ```
 sudo cp minesweeper /usr/local/bin/
 ```
 
-# Edit and Install upstart script
+Edit and Install upstart script
 ```
 set "env MINESWEEPER_GOOGLE_API_KEY=" to your Google API Key in /etc/init/minesweeper.conf
 sudo cp minesweeper.conf /etc/init/
 ```
 
-# Start minesweeper
+Start minesweeper
 ```
 sudo service minesweeper start
 ```
 
-### Test
+# Test
 
 Minesweeper listens on 127.0.0.1:6463 by default.
 
 E.g. Scan it.
-
 ```
 $ curl http://localhost:6463/scan?url=ianfette.org
 {
@@ -101,7 +100,6 @@ $ curl http://localhost:6463/scan?url=ianfette.org
 ```
 
 E.g. Get Report.
-
 ```
 $ curl http://localhost:6463/report?id=20141201202108-214329780
 {
@@ -135,14 +133,13 @@ $ curl http://localhost:6463/report?id=20141201202108-214329780
 ```
 
 E.g. Get PCAP.
-
 ```
 $ curl http://localhost:6463/pcap?id=20141201202108-214329780 > foo.pcap
 $ file foo.pcap
 foo.pcap: tcpdump capture file (little-endian) - version 2.4 (Ethernet, capture length 65535)
 ```
 
-### How does it work?
+# How does it work?
 
 Minesweeper will scan a URL, perform a security analysis and say it's `suspicious` or `ok`.
 
