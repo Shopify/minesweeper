@@ -37,18 +37,19 @@ sudo apt-get update
 sudo apt-get install suricata
 ```
 
-Edit /etc/suricata/suricata.yaml
+Edit config
 ```
-af-packet.interface: lo
-outputs.fast.enabled: yes
-HOME_NET="127.0.0.1"
-EXTERNAL_NET="127.0.0.1" in /etc/suricata/suricata.yaml
-HTTP_PORTS="1024:" in /etc/suricata/suricata.yaml
-host-os-policy.windows: [] in /etc/suricata/suricata.yaml
-host-os-policy.linux: [0.0.0.0/0] in /etc/suricata/suricata.yaml
+sudo vim /etc/suricata/suricata.yaml
+> af-packet.interface: lo
+> outputs.fast.enabled: yes
+> HOME_NET="127.0.0.1"
+> EXTERNAL_NET="127.0.0.1" in /etc/suricata/suricata.yaml
+> HTTP_PORTS="1024:" in /etc/suricata/suricata.yaml
+> host-os-policy.windows: [] in /etc/suricata/suricata.yaml
+> host-os-policy.linux: [0.0.0.0/0] in /etc/suricata/suricata.yaml
 ```
 
-Start Suricata
+Start
 ```
 sudo service suricata start
 ```
@@ -71,7 +72,7 @@ Download
 curl -O https://github.com/Shopify/minesweeper/releases/download/0.2.0/minesweeper-0.2.0-linux-amd64.tar.gz
 ```
 
-Extract
+Extract and cd
 ```
 tar xzf minesweeper-0.2.0-linux-amd64.tar.gz
 cd minesweeper-0.2.0-linux-amd64
@@ -82,9 +83,10 @@ Install binary
 sudo cp minesweeper /usr/local/bin/
 ```
 
-Edit upstart script (minesweeper.conf)
+Add Google API key to upstart script
 ```
-env MINESWEEPER_GOOGLE_API_KEY=your_google_api_key
+vim minesweeper.conf
+> env MINESWEEPER_GOOGLE_API_KEY=your_google_api_key
 ```
 
 Install upstart script
