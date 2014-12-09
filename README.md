@@ -14,6 +14,13 @@ Minesweeper scans websites to detect drive-by malware.
 
 This guide is for Ubuntu 14.04, non-root user with sudo privilege.
 
+### UTC
+
+Please ensure the server is set to UTC
+```
+sudo dpkg-reconfigure tzdata
+```
+
 ### PhantomJS
 
 Install phantomjs, minesweeper's headless browser of choice
