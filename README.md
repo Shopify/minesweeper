@@ -16,9 +16,14 @@ This guide is for Ubuntu 14.04, non-root user with sudo privilege.
 
 ### Server config
 
-Add a user to run minesweeper
+Add a user to run minesweeper and give it permission to use tcpdump
 ```
 sudo adduser --system minesweeper
+sudo groupadd tcpdump
+sudo usermod -a -G tcpdump minesweeper
+sudo chgrp tcpdump /usr/sbin/tcpdump
+sudo chmod 750 /usr/sbin/tcpdump
+sudo setcap "cap_net_raw+eip" /usr/sbin/tcpdump
 ```
 
 Ensure the server timezone is set to UTC
@@ -63,13 +68,6 @@ sudo service suricata start
 Give minesweeper read permission to the suricata alerts file
 ```
 sudo chmod a+r /var/log/suricata/fast.log
-```
-
-### tcpdump
-
-Allow a non-root user to capture with tcpdump
-```
-sudo setcap "cap_net_raw+eip" /usr/sbin/tcpdump
 ```
 
 ### Google
