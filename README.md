@@ -12,7 +12,7 @@ Minesweeper scans websites to detect drive-by malware.
 
 ## <a name="install"></a> Install
 
-This guide is for Ubuntu 14.04, non-root user with sudo privilege.
+This guide is for Ubuntu Server 14.04 LTS "Trusty Tahr", non-root user with sudo privilege.
 
 ### Server config
 
