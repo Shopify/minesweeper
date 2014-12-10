@@ -14,9 +14,14 @@ Minesweeper scans websites to detect drive-by malware.
 
 This guide is for Ubuntu 14.04, non-root user with sudo privilege.
 
-### UTC
+### Server config
 
-Please ensure the server is set to UTC
+Add a user to run minesweeper
+```
+sudo adduser --system minesweeper
+```
+
+Ensure the server timezone is set to UTC
 ```
 sudo dpkg-reconfigure tzdata
 ```
