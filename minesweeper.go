@@ -2,8 +2,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -22,10 +20,8 @@ import (
 	"time"
 
 	sh "github.com/codeskyblue/go-sh"
-	"github.com/elazarl/goproxy"
 
 	"github.com/Shopify/minesweeper/blacklist"
-	"github.com/Shopify/minesweeper/ids"
 	"github.com/Shopify/minesweeper/phantom"
 )
 
@@ -33,7 +29,6 @@ var baseDir string
 var cacheDir string
 
 var bls []blacklist.Blacklist
-var idss []ids.Ids
 
 var dnsCache = make(map[string]string, 0)
 var dnsCacheLock sync.RWMutex
@@ -59,7 +54,6 @@ type MinesweeperReport struct {
 	Resources []MinesweeperReportResource
 	Changes   []MinesweeperReportChange
 	Hits      []blacklist.Hit
-	Alerts    []ids.Alert
 }
 
 type MinesweeperReportResource struct {
@@ -88,47 +82,6 @@ func checkErr(err error, msg string) {
 
 func initModules() {
 	bls = blacklist.Init(cacheDir, options.Modules)
-	idss = ids.Init(options.Modules)
-}
-
-func startLoProxy() (net.Listener, *goproxy.ProxyHttpServer, string) {
-	proxy := goproxy.NewProxyHttpServer()
-	proxy.Tr.DisableCompression = false
-	proxy.Tr.MaxIdleConnsPerHost = 64
-	proxy.Tr.Dial = cacheDial
-
-	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
-		if resp == nil {
-			return resp
-		}
-
-		b, err := ioutil.ReadAll(resp.Body)
-		if err == nil {
-			h256 := sha256.Sum256(b)
-			hexOfSha256 := hex.EncodeToString(h256[:])
-			resp.Header.Add("Minesweeper-Sha256", hexOfSha256)
-
-			sniffedMime := http.DetectContentType(b)
-			resp.Header.Add("Minesweeper-Sniffed-Mime", sniffedMime)
-
-			resp.Body = ioutil.NopCloser(bytes.NewBuffer(b))
-		}
-
-		return resp
-	})
-
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	checkErr(err, "proxy listen")
-
-	_, port, err := net.SplitHostPort(ln.Addr().String())
-	checkErr(err, "proxy split host port")
-
-	s := &http.Server{
-		Handler: proxy,
-	}
-	go s.Serve(ln)
-
-	return ln, proxy, port
 }
 
 func createBaseAndCacheDirs() {
@@ -150,8 +103,6 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 	report.Url = rawurl
 	report.CreatedAt = createdAt.Format(time.UnixDate)
 
-	ln, proxy, proxyPort := startLoProxy()
-
 	runDir, err := ioutil.TempDir("", "minesweeper")
 	checkErr(err, "create temp dir")
 	tokens := strings.Split(runDir, "minesweeper")
@@ -159,36 +110,18 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 	report.Id = yyyymmddhhmmss + "-" + randDir
 
 	minesweeperFileName := filepath.Join(runDir, report.Id)
-
-	tcpdumpArgs := []string{"-n", "-p", "-U", "-ilo", "-s0", "-w" + minesweeperFileName + ".pcap", "tcp port " + proxyPort}
-	tcpdump := sh.Command("tcpdump", tcpdumpArgs)
-	tcpdump.Stdout = nil
-	tcpdump.Stderr = nil
-	err = tcpdump.Start()
-	checkErr(err, "start tcpdump")
-	go func() {
-		err = tcpdump.Wait()
-		checkErr(err, "wait tcpdump")
-	}()
+	reportFileName := minesweeperFileName + ".json"
 
 	phantomScript := filepath.Join(runDir, "minesweeper.js")
 	err = ioutil.WriteFile(phantomScript, []byte(phantom.Script()), 0644)
 	checkErr(err, "write phantom script to base dir")
 
-	args := []string{"--load-images=no", "--ignore-ssl-errors=yes", "--ssl-protocol=any", "--web-security=no", "--proxy=127.0.0.1:" + proxyPort, phantomScript, rawurl, options.UserAgent, strconv.Itoa(options.WaitAround)}
-
-	startTime := time.Now().UTC()
+	args := []string{"--load-images=no", "--ignore-ssl-errors=yes", "--ssl-protocol=any", "--web-security=no", phantomScript, rawurl, options.UserAgent, strconv.Itoa(options.WaitAround)}
 	out, err := sh.Command("phantomjs", args).SetTimeout(time.Second * 10).Output()
-	endTime := time.Now().UTC()
-
-	go func() {
-		time.Sleep(2000 * time.Millisecond)
-		tcpdump.Kill(os.Interrupt)
-	}()
-
 	if err != nil {
 		report.Verdict = "error"
 		report.Error = "exec phantomjs: " + err.Error()
+		writeReportToFile(report, reportFileName)
 		return
 	}
 
@@ -203,6 +136,7 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 			if err != nil {
 				report.Verdict = "error"
 				report.Error = "json unmarshal resource: " + err.Error()
+				writeReportToFile(report, reportFileName)
 				return
 			}
 			report.Resources = append(report.Resources, resource)
@@ -217,6 +151,7 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 			if err != nil {
 				report.Verdict = "error"
 				report.Error = "json unmarshal change: " + err.Error()
+				writeReportToFile(report, reportFileName)
 				return
 			}
 			report.Changes = append(report.Changes, change)
@@ -224,34 +159,33 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 	}
 
 	report.Hits = blacklist.Check(bls, urls)
-	report.Alerts = ids.Check(idss, startTime, endTime, proxyPort)
 
 	report.Verdict = "ok"
-	if len(report.Hits)+len(report.Alerts) > 0 {
+	if len(report.Hits) > 0 {
 		report.Verdict = "suspicious"
 	}
 
+	expireResults()
+
+	writeReportToFile(report, reportFileName)
+	return
+}
+
+func writeReportToFile(report *MinesweeperReport, filename string) {
 	b, err := json.MarshalIndent(report, "", "  ")
 	checkErr(err, "jsonify report")
 	b = bytes.Replace(b, []byte("\\u003c"), []byte("<"), -1)
 	b = bytes.Replace(b, []byte("\\u003e"), []byte(">"), -1)
 	b = bytes.Replace(b, []byte("\\u0026"), []byte("&"), -1)
 
-	err = ioutil.WriteFile(minesweeperFileName+".json", b, 0644)
+	err = ioutil.WriteFile(filename, b, 0644)
 	checkErr(err, "write json report to file")
-
-	expireResults()
-
-	proxy.Tr.CloseIdleConnections()
-	ln.Close()
-
-	return
 }
 
 func parseArgs() {
 	flag.StringVar(&options.Binding, "b", "127.0.0.1", "Binds to the specified IP")
 	flag.IntVar(&options.Expiry, "e", 24, "Expire results after N hours")
-	flag.StringVar(&options.Modules, "m", "google,malwaredomains,suricata", "Module run list")
+	flag.StringVar(&options.Modules, "m", "google,malwaredomains", "Module run list")
 	flag.StringVar(&options.Port, "p", "6463", "Runs on the specified port")
 	flag.StringVar(&options.UserAgent, "u", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.65 Safari/537.36", "User-Agent")
 	flag.IntVar(&options.Workers, "w", 16, "Workers")
@@ -356,7 +290,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	req.ParseForm()
 
-	if req.URL.Path == "/report" || req.URL.Path == "/pcap" {
+	if req.URL.Path == "/report" {
 		if req.Form["id"] == nil {
 			logHttpError(req, w, "Missing Id", http.StatusBadRequest)
 			return
@@ -371,13 +305,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		yyyymmddhhmmss := tokens[0]
 		randDir := tokens[1]
 
-		p := path.Join(os.TempDir(), "minesweeper"+randDir, yyyymmddhhmmss+"-"+randDir)
-		if req.URL.Path == "/report" {
-			p = p + ".json"
-		}
-		if req.URL.Path == "/pcap" {
-			p = p + ".pcap"
-		}
+		p := path.Join(os.TempDir(), "minesweeper"+randDir, yyyymmddhhmmss+"-"+randDir) + ".json"
 
 		if _, err := os.Stat(p); os.IsNotExist(err) {
 			logHttpError(req, w, "Report expired or bad id", http.StatusBadRequest)
