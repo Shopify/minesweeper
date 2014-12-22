@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"os/user"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -27,6 +26,7 @@ import (
 
 var baseDir string
 var cacheDir string
+var phantomScript string
 
 var bls []blacklist.Blacklist
 
@@ -57,14 +57,12 @@ type MinesweeperReport struct {
 }
 
 type MinesweeperReportResource struct {
-	Method                 string
-	Url                    string
-	Status                 int
-	ContentType            string
-	ContentLength          int
-	MinesweeperSha256      string `json:",omitempty"`
-	MinesweeperSniffedMime string `json:",omitempty"`
-	Error                  string `json:",omitempty"`
+	Method        string
+	Url           string
+	Status        int
+	ContentType   string
+	ContentLength int
+	Error         string `json:",omitempty"`
 }
 
 type MinesweeperReportChange struct {
@@ -95,33 +93,22 @@ func createBaseAndCacheDirs() {
 	os.MkdirAll(cacheDir, 0755)
 }
 
-func Minesweeper(rawurl string) (report *MinesweeperReport) {
-	createdAt := time.Now().UTC()
-	yyyymmddhhmmss := createdAt.Format("20060102150405")
+func writePhantomScript() {
+	phantomScript = filepath.Join(baseDir, "minesweeper.js")
+	err := ioutil.WriteFile(phantomScript, []byte(phantom.Script()), 0644)
+	checkErr(err, "write phantom script to base dir")
+}
 
+func Minesweeper(rawurl string) (report *MinesweeperReport) {
 	report = &MinesweeperReport{}
 	report.Url = rawurl
-	report.CreatedAt = createdAt.Format(time.UnixDate)
-
-	runDir, err := ioutil.TempDir("", "minesweeper")
-	checkErr(err, "create temp dir")
-	tokens := strings.Split(runDir, "minesweeper")
-	randDir := tokens[len(tokens)-1]
-	report.Id = yyyymmddhhmmss + "-" + randDir
-
-	minesweeperFileName := filepath.Join(runDir, report.Id)
-	reportFileName := minesweeperFileName + ".json"
-
-	phantomScript := filepath.Join(runDir, "minesweeper.js")
-	err = ioutil.WriteFile(phantomScript, []byte(phantom.Script()), 0644)
-	checkErr(err, "write phantom script to base dir")
+	report.CreatedAt = time.Now().UTC().Format(time.UnixDate)
 
 	args := []string{"--load-images=no", "--ignore-ssl-errors=yes", "--ssl-protocol=any", "--web-security=no", phantomScript, rawurl, options.UserAgent, strconv.Itoa(options.WaitAround)}
 	out, err := sh.Command("phantomjs", args).SetTimeout(time.Second * 10).Output()
 	if err != nil {
 		report.Verdict = "error"
 		report.Error = "exec phantomjs: " + err.Error()
-		writeReportToFile(report, reportFileName)
 		return
 	}
 
@@ -136,7 +123,6 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 			if err != nil {
 				report.Verdict = "error"
 				report.Error = "json unmarshal resource: " + err.Error()
-				writeReportToFile(report, reportFileName)
 				return
 			}
 			report.Resources = append(report.Resources, resource)
@@ -151,7 +137,6 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 			if err != nil {
 				report.Verdict = "error"
 				report.Error = "json unmarshal change: " + err.Error()
-				writeReportToFile(report, reportFileName)
 				return
 			}
 			report.Changes = append(report.Changes, change)
@@ -165,21 +150,7 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 		report.Verdict = "suspicious"
 	}
 
-	expireResults()
-
-	writeReportToFile(report, reportFileName)
 	return
-}
-
-func writeReportToFile(report *MinesweeperReport, filename string) {
-	b, err := json.MarshalIndent(report, "", "  ")
-	checkErr(err, "jsonify report")
-	b = bytes.Replace(b, []byte("\\u003c"), []byte("<"), -1)
-	b = bytes.Replace(b, []byte("\\u003e"), []byte(">"), -1)
-	b = bytes.Replace(b, []byte("\\u0026"), []byte("&"), -1)
-
-	err = ioutil.WriteFile(filename, b, 0644)
-	checkErr(err, "write json report to file")
 }
 
 func parseArgs() {
@@ -276,8 +247,8 @@ type Request struct {
 }
 
 type Response struct {
-	Verdict  string
-	ReportId string
+	Verdict string
+	Report  *MinesweeperReport `json:",omitempty"`
 }
 
 func logHttpError(req *http.Request, w http.ResponseWriter, errorMessage string, code int) {
@@ -290,70 +261,52 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	req.ParseForm()
 
-	if req.URL.Path == "/report" {
-		if req.Form["id"] == nil {
-			logHttpError(req, w, "Missing Id", http.StatusBadRequest)
-			return
-		}
-
-		reportId := req.Form["id"][0]
-		tokens := strings.Split(reportId, "-")
-		if len(tokens) != 2 {
-			logHttpError(req, w, "Bad Id", http.StatusBadRequest)
-			return
-		}
-		yyyymmddhhmmss := tokens[0]
-		randDir := tokens[1]
-
-		p := path.Join(os.TempDir(), "minesweeper"+randDir, yyyymmddhhmmss+"-"+randDir) + ".json"
-
-		if _, err := os.Stat(p); os.IsNotExist(err) {
-			logHttpError(req, w, "Report expired or bad id", http.StatusBadRequest)
-		} else {
-			log.Printf("%d [%s %s]\n", 200, req.Method, req.URL.String())
-			http.ServeFile(w, req, p)
-		}
-	} else {
-		if req.URL.Path != "/scan" {
-			logHttpError(req, w, "Unknown Path", http.StatusBadRequest)
-			return
-		}
-
-		if req.Form["url"] == nil {
-			logHttpError(req, w, "Missing URL", http.StatusBadRequest)
-			return
-		}
-
-		rawurl := strings.ToLower(req.Form["url"][0])
-		if !strings.HasPrefix(rawurl, "http") {
-			rawurl = "http://" + rawurl
-		}
-
-		_, err := url.Parse(rawurl)
-		if err != nil {
-			logHttpError(req, w, "Couldn't parse URL", http.StatusBadRequest)
-			return
-		}
-
-		if strings.Contains(rawurl, "127.0.0.1") || strings.Contains(rawurl, "localhost") {
-			logHttpError(req, w, "Localhost prevents proxy, workaround using hosts file", http.StatusBadRequest)
-			return
-		}
-
-		request := &Request{Url: rawurl, ResultChan: make(chan *MinesweeperReport)}
-		s.Requests <- request
-		report := <-request.ResultChan
-
-		response := &Response{Verdict: report.Verdict, ReportId: report.Id}
-		b, err := json.MarshalIndent(response, "", "  ")
-		if err != nil {
-			logHttpError(req, w, "Couldn't create JSON response", http.StatusInternalServerError)
-			return
-		}
-
-		log.Printf("%d %s %s [%s %s] %s\n", 200, report.Verdict, report.Id, req.Method, req.URL.String(), report.Error)
-		w.Write(b)
+	if req.URL.Path != "/scan" {
+		logHttpError(req, w, "Unknown Path", http.StatusBadRequest)
+		return
 	}
+
+	if req.Form["url"] == nil {
+		logHttpError(req, w, "Missing URL", http.StatusBadRequest)
+		return
+	}
+
+	rawurl := strings.ToLower(req.Form["url"][0])
+	if !strings.HasPrefix(rawurl, "http") {
+		rawurl = "http://" + rawurl
+	}
+
+	_, err := url.Parse(rawurl)
+	if err != nil {
+		logHttpError(req, w, "Couldn't parse URL", http.StatusBadRequest)
+		return
+	}
+
+	if strings.Contains(rawurl, "127.0.0.1") || strings.Contains(rawurl, "localhost") {
+		logHttpError(req, w, "Localhost prevents proxy, workaround using hosts file", http.StatusBadRequest)
+		return
+	}
+
+	request := &Request{Url: rawurl, ResultChan: make(chan *MinesweeperReport)}
+	s.Requests <- request
+	report := <-request.ResultChan
+
+	response := &Response{Verdict: report.Verdict}
+	if report.Verdict != "ok" {
+		response.Report = report
+	}
+
+	b, err := json.MarshalIndent(response, "", "  ")
+	if err != nil {
+		logHttpError(req, w, "Couldn't create JSON response", http.StatusInternalServerError)
+		return
+	}
+	b = bytes.Replace(b, []byte("\\u003c"), []byte("<"), -1)
+	b = bytes.Replace(b, []byte("\\u003e"), []byte(">"), -1)
+	b = bytes.Replace(b, []byte("\\u0026"), []byte("&"), -1)
+
+	log.Printf("%d %s %s [%s %s] %s\n", 200, report.Verdict, report.Id, req.Method, req.URL.String(), report.Error)
+	w.Write(b)
 }
 
 func worker(requests chan *Request) {
@@ -373,22 +326,10 @@ func workerPool(n int) chan *Request {
 	return requests
 }
 
-func expireResults() {
-	go func() {
-		matches, _ := filepath.Glob(path.Join(os.TempDir(), "minesweeper*"))
-		for _, match := range matches {
-			fi, _ := os.Stat(match)
-			if fi.Mode().IsDir() && fi.ModTime().Add(time.Duration(options.Expiry)*time.Hour).Before(time.Now().UTC()) {
-				os.RemoveAll(match)
-			}
-		}
-	}()
-}
-
 func main() {
 	parseArgs()
 	createBaseAndCacheDirs()
-	expireResults()
+	writePhantomScript()
 	initModules()
 
 	requests := workerPool(options.Workers)
