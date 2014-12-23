@@ -21,11 +21,6 @@ Add a user to run minesweeper
 sudo adduser --system minesweeper
 ```
 
-Ensure the server timezone is set to UTC
-```
-sudo dpkg-reconfigure tzdata
-```
-
 ### PhantomJS
 
 Install phantomjs
