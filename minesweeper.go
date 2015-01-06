@@ -46,7 +46,6 @@ type MinesweeperOptions struct {
 var options = new(MinesweeperOptions)
 
 type MinesweeperReport struct {
-	Id        string
 	Url       string
 	Verdict   string
 	Error     string `json:",omitempty"`
@@ -139,6 +138,14 @@ func Minesweeper(rawurl string) (report *MinesweeperReport) {
 				report.Error = "json unmarshal change: " + err.Error()
 				return
 			}
+      if strings.HasPrefix(change.Content, "[") {
+        change.Content = strings.TrimPrefix(change.Content, "[")
+        change.Content = strings.TrimSuffix(change.Content, "]")
+      }
+      if strings.HasPrefix(change.Context, "[") {
+        change.Context = strings.TrimPrefix(change.Context, "[")
+        change.Context = strings.TrimSuffix(change.Context, "]")
+      }
 			report.Changes = append(report.Changes, change)
 		}
 	}
@@ -305,7 +312,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	b = bytes.Replace(b, []byte("\\u003e"), []byte(">"), -1)
 	b = bytes.Replace(b, []byte("\\u0026"), []byte("&"), -1)
 
-	log.Printf("%d %s %s [%s %s] %s\n", 200, report.Verdict, report.Id, req.Method, req.URL.String(), report.Error)
+	log.Printf("%d %s [%s %s] %s\n", 200, report.Verdict, req.Method, req.URL.String(), report.Error)
 	w.Write(b)
 }
 

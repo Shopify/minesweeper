@@ -78,8 +78,8 @@ page.onInitialized = function() {
 
         var change = {};
         change.Type = "document.write";
-        change.Content = s;
-        change.Context = trace;
+        change.Content = "[" + s + "]";
+        change.Context = "[" + trace + "]";
         console.log("CHANGE " + JSON.stringify(change));
       }
     }
@@ -91,7 +91,7 @@ page.onInitialized = function() {
       if (elementTypes.indexOf(targetType) !== -1) {
         var change = {};
         change.Type = "DOMSubtreeModified";
-        change.Content = e.target.outerHTML; //outerHTML(e.target);
+        change.Content = "[" + e.target.outerHTML + "]"; //outerHTML(e.target);
         change.Context = null;
         console.log("CHANGE " + JSON.stringify(change));
       }
