@@ -1,0 +1,9 @@
+name: minesweeper
+
+up:
+  - go: 1.6.2
+
+commands:
+  build:
+    run: godep go build
+    desc: 'build the project'

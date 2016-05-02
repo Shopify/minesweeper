@@ -1,0 +1,30 @@
+{
+	"ImportPath": "github.com/shopify/minesweeper",
+	"GoVersion": "go1.6",
+	"GodepVersion": "v62",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/Shopify/minesweeper/blacklist",
+			"Comment": "0.3.1-1-g202111e",
+			"Rev": "202111ef527ef2fe6723b59518c41780e30da44b"
+		},
+		{
+			"ImportPath": "github.com/Shopify/minesweeper/phantom",
+			"Comment": "0.3.1-1-g202111e",
+			"Rev": "202111ef527ef2fe6723b59518c41780e30da44b"
+		},
+		{
+			"ImportPath": "github.com/codegangsta/inject",
+			"Comment": "v1.0-rc1-10-g33e0aa1",
+			"Rev": "33e0aa1cb7c019ccc3fbe049a8262a6403d30504"
+		},
+		{
+			"ImportPath": "github.com/codeskyblue/go-sh",
+			"Comment": "v0.1-39-gb7c09e5",
+			"Rev": "b7c09e505267c5137dfb15b834299dac33dae7b4"
+		}
+	]
+}
