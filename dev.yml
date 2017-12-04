@@ -7,7 +7,3 @@ commands:
   build:
     run: godep go build
     desc: 'build the project'
-
-packages:
-  - git@github.com:Shopify/dev-shopify.git
-
